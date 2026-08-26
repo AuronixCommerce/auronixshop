@@ -4,82 +4,171 @@ import { adminDb } from '@/lib/firebase-admin';
 import { requireAdmin } from '@/lib/server-auth';
 import { sendTicketResponseEmail } from '@/lib/server-mail';
 
-function text(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+function text(
+  value: unknown
+) {
+  return typeof value === 'string'
+    ? value.trim()
+    : '';
 }
 
-export async function POST(request: Request) {
+export async function POST(
+  request: Request
+) {
   try {
-    const admin = await requireAdmin(request);
-    const body = await request.json();
+    const admin =
+      await requireAdmin(
+        request
+      );
 
-    const ticketId = text(body.ticketId);
-    const response = text(body.response);
+    const body =
+      await request.json();
 
-    if (!ticketId || !response) {
+    const ticketId =
+      text(
+        body?.ticketId
+      );
+
+    const response =
+      text(
+        body?.response
+      );
+
+    const aiGenerated =
+      body?.aiGenerated ===
+      true;
+
+    if (
+      !ticketId ||
+      !response
+    ) {
       return NextResponse.json(
         {
           error:
             'Ticket ID and response are required.',
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     const ticketRef =
-      adminDb.ref(`tickets/${ticketId}`);
+      adminDb.ref(
+        `tickets/${ticketId}`
+      );
 
-    const snapshot = await ticketRef.get();
+    const snapshot =
+      await ticketRef.get();
 
-    if (!snapshot.exists()) {
+    if (
+      !snapshot.exists()
+    ) {
       return NextResponse.json(
-        { error: 'Ticket not found.' },
-        { status: 404 }
+        {
+          error:
+            'Ticket not found.',
+        },
+        {
+          status: 404,
+        }
       );
     }
 
-    const ticket = snapshot.val();
+    const ticket =
+      snapshot.val();
 
-    if (!text(ticket.email)) {
+    const customerEmail =
+      text(
+        ticket?.email
+      );
+
+    if (!customerEmail) {
       return NextResponse.json(
         {
           error:
             'This ticket does not contain a customer email.',
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     const messageRef =
-      ticketRef.child('messages').push();
+      ticketRef
+        .child('messages')
+        .push();
 
     await messageRef.set({
-      role: 'admin',
-      content: response,
-      createdAt: Date.now(),
-      createdBy: admin.uid,
+      role:
+        aiGenerated
+          ? 'ai'
+          : 'admin',
+
+      content:
+        response,
+
+      createdAt:
+        Date.now(),
+
+      createdBy:
+        admin.uid,
+
+      aiGenerated:
+        aiGenerated,
     });
 
     await ticketRef.update({
-      lastResponse: response,
-      respondedAt: Date.now(),
-      updatedAt: Date.now(),
+      lastResponse:
+        response,
+
+      respondedAt:
+        Date.now(),
+
+      updatedAt:
+        Date.now(),
+
       status:
-        ticket.status === 'closed'
+        ticket.status ===
+        'closed'
           ? 'open'
           : 'in-progress',
     });
 
-    await sendTicketResponseEmail(
-      ticket.email,
-      ticket.subject || 'Auronix Support',
-      response
-    );
+    await sendTicketResponseEmail({
+      to:
+        customerEmail,
+
+      name:
+        text(
+          ticket?.name
+        ),
+
+      subject:
+        text(
+          ticket?.subject
+        ) ||
+        'Auronix Commerce Support',
+
+      body:
+        response,
+
+      ticketId,
+
+      aiGenerated,
+
+      automated:
+        true,
+    });
 
     return NextResponse.json({
-      success: true,
+      success:
+        true,
     });
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.error(
       'Ticket response send failed:',
       error
@@ -92,7 +181,9 @@ export async function POST(request: Request) {
             ? error.message
             : 'Unable to send support response.',
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }

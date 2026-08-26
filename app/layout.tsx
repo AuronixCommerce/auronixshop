@@ -6,16 +6,16 @@ import type {
 } from 'next';
 
 import {
+  headers,
+} from 'next/headers';
+
+import {
   Inter,
 } from 'next/font/google';
 
 import {
   Toaster,
 } from '@/components/ui/toaster';
-
-import {
-  AIChat,
-} from '@/components/site/ai-chat';
 
 import {
   ScrollTextEffects,
@@ -32,6 +32,14 @@ import {
 import {
   PublicRuntime,
 } from '@/components/site/public-runtime';
+
+import {
+  MaintenanceShell,
+} from '@/components/site/maintenance-shell';
+
+import {
+  getMaintenanceContext,
+} from '@/lib/server-maintenance-context';
 
 const inter =
   Inter({
@@ -73,37 +81,182 @@ export const metadata: Metadata = {
   },
 
   robots: {
-    index:
-      true,
-
-    follow:
-      true,
-
-    googleBot: {
-      index:
-        true,
-
-      follow:
-        true,
-
-      'max-image-preview':
-        'large',
-
-      'max-snippet':
-        -1,
-
-      'max-video-preview':
-        -1,
-    },
+    index: true,
+    follow: true,
   },
 };
 
-export default function RootLayout({
+function strictBoolean(
+  value: unknown
+) {
+  return (
+    value === true ||
+    value === 1 ||
+    value === '1' ||
+    value === 'true' ||
+    value === 'TRUE' ||
+    value === 'True'
+  );
+}
+
+export default async function RootLayout({
   children,
 }: {
   children:
     React.ReactNode;
 }) {
+  const requestHeaders =
+    headers();
+
+  const pathname =
+    requestHeaders.get(
+      'x-auronix-pathname'
+    ) || '/';
+
+  /*
+   * ==========================================================
+   * ADMIN BYPASS
+   * ==========================================================
+   *
+   * Admin must always remain accessible,
+   * even when full-site maintenance is ON.
+   */
+
+  const isAdmin =
+    pathname === '/admin' ||
+    pathname.startsWith(
+      '/admin/'
+    );
+
+  /*
+   * ==========================================================
+   * MAINTENANCE CHECK
+   * ==========================================================
+   */
+
+  let maintenance:
+    | Awaited<
+        ReturnType<
+          typeof getMaintenanceContext
+        >
+      >
+    | null = null;
+
+  if (
+    !isAdmin &&
+    !pathname.startsWith(
+      '/api/'
+    ) &&
+    pathname !==
+      '/maintenance'
+  ) {
+    try {
+      maintenance =
+        await getMaintenanceContext(
+          pathname
+        );
+    } catch (
+      error
+    ) {
+      console.error(
+        '[Auronix Root Layout] Maintenance check failed:',
+        error
+      );
+    }
+  }
+
+  const globalActive =
+    strictBoolean(
+      maintenance?.global?.active
+    );
+
+  const pageActive =
+    strictBoolean(
+      maintenance?.page?.active
+    );
+
+  /*
+   * ==========================================================
+   * ACTIVE MAINTENANCE
+   * ==========================================================
+   *
+   * CRITICAL:
+   *
+   * Do NOT render:
+   * - header
+   * - footer
+   * - public popup
+   * - scroll typography
+   * - PublicSiteChrome
+   *
+   * Only the maintenance shell.
+   */
+
+  if (
+    !isAdmin &&
+    (
+      globalActive ||
+      pageActive
+    )
+  ) {
+    return (
+      <html
+        lang="en"
+        className={
+          inter.variable
+        }
+      >
+        <head>
+          <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, viewport-fit=cover"
+          />
+
+          <meta
+            name="theme-color"
+            content="#0A0A0A"
+          />
+        </head>
+
+        <body
+          className="min-h-screen bg-background antialiased"
+          style={{
+            fontFamily:
+              'var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          }}
+        >
+          <MaintenanceShell
+            globalActive={
+              globalActive
+            }
+            pageActive={
+              pageActive
+            }
+            pathname={
+              pathname
+            }
+            globalEndAt={
+              maintenance?.global
+                ?.endAt ??
+              null
+            }
+            pageEndAt={
+              maintenance?.page
+                ?.endAt ??
+              null
+            }
+          />
+        </body>
+      </html>
+    );
+  }
+
+  /*
+   * ==========================================================
+   * NORMAL SITE
+   * ==========================================================
+   */
+
   return (
     <html
       lang="en"

@@ -36,22 +36,58 @@ import {
 type PageControl = {
   path: string;
 
+  /* ==========================================================
+     WEBSITE / PAGE MAINTENANCE
+     ========================================================== */
+
   maintenanceEnabled: boolean;
+
   maintenanceTitle: string;
+
   maintenanceMessage: string;
 
   scheduleEnabled: boolean;
+
   scheduleStartAt:
     | number
     | null;
+
   scheduleEndAt:
     | number
     | null;
 
+  /* ==========================================================
+     AI MAINTENANCE
+     ========================================================== */
+
+  aiMaintenanceEnabled: boolean;
+
+  aiMaintenanceTitle: string;
+
+  aiMaintenanceMessage: string;
+
+  aiScheduleEnabled: boolean;
+
+  aiScheduleStartAt:
+    | number
+    | null;
+
+  aiScheduleEndAt:
+    | number
+    | null;
+
+  /* ==========================================================
+     PAGE POPUP
+     ========================================================== */
+
   popupEnabled: boolean;
+
   popupTitle: string;
+
   popupMessage: string;
+
   popupButtonText: string;
+
   popupButtonUrl: string;
 
   popupFrequency:
@@ -63,42 +99,42 @@ type PageControl = {
     | number
     | null;
 
+  /* ==========================================================
+     AUTOMATION / HEALTH
+     ========================================================== */
+
   automaticMaintenanceEnabled: boolean;
+
   automaticRecoveryEnabled: boolean;
 
-  failureThreshold:
-    number;
+  failureThreshold: number;
 
-  adminBypassEnabled:
-    boolean;
+  adminBypassEnabled: boolean;
 
-  healthScore:
-    number;
+  healthScore: number;
 
-  healthStatus:
-    string;
+  healthStatus: string;
 
-  consecutiveFailures:
-    number;
+  consecutiveFailures: number;
 
-  lastError:
-    string;
+  lastError: string;
+
   updatedAt?:
-    number;
+    | number;
 };
 
 type GlobalControl = {
-  maintenanceEnabled:
-    boolean;
+  /* ==========================================================
+     FULL WEBSITE
+     ========================================================== */
 
-  maintenanceTitle:
-    string;
+  maintenanceEnabled: boolean;
 
-  maintenanceMessage:
-    string;
+  maintenanceTitle: string;
 
-  scheduleEnabled:
-    boolean;
+  maintenanceMessage: string;
+
+  scheduleEnabled: boolean;
 
   scheduleStartAt:
     | number
@@ -108,16 +144,36 @@ type GlobalControl = {
     | number
     | null;
 
-  automaticFullSiteShutdown:
-    boolean;
+  automaticFullSiteShutdown: boolean;
 
-  automaticRecovery:
-    boolean;
+  automaticRecovery: boolean;
+
+  /* ==========================================================
+     GLOBAL AI
+     ========================================================== */
+
+  aiMaintenanceEnabled: boolean;
+
+  aiMaintenanceTitle: string;
+
+  aiMaintenanceMessage: string;
+
+  aiScheduleEnabled: boolean;
+
+  aiScheduleStartAt:
+    | number
+    | null;
+
+  aiScheduleEndAt:
+    | number
+    | null;
 };
 
 const EMPTY_PAGE:
   PageControl = {
   path: '',
+
+  /* Website maintenance */
 
   maintenanceEnabled:
     false,
@@ -136,6 +192,28 @@ const EMPTY_PAGE:
 
   scheduleEndAt:
     null,
+
+  /* AI maintenance */
+
+  aiMaintenanceEnabled:
+    false,
+
+  aiMaintenanceTitle:
+    'Auronix AI Maintenance',
+
+  aiMaintenanceMessage:
+    'Auronix AI is temporarily under maintenance. Please check back shortly.',
+
+  aiScheduleEnabled:
+    false,
+
+  aiScheduleStartAt:
+    null,
+
+  aiScheduleEndAt:
+    null,
+
+  /* Popup */
 
   popupEnabled:
     false,
@@ -157,6 +235,8 @@ const EMPTY_PAGE:
 
   popupUntilAt:
     null,
+
+  /* Automation */
 
   automaticMaintenanceEnabled:
     true,
@@ -185,6 +265,8 @@ const EMPTY_PAGE:
 
 const EMPTY_GLOBAL:
   GlobalControl = {
+  /* Full website */
+
   maintenanceEnabled:
     false,
 
@@ -208,6 +290,26 @@ const EMPTY_GLOBAL:
 
   automaticRecovery:
     false,
+
+  /* Global AI */
+
+  aiMaintenanceEnabled:
+    false,
+
+  aiMaintenanceTitle:
+    'Auronix AI Maintenance',
+
+  aiMaintenanceMessage:
+    'Auronix AI is temporarily under maintenance. Please check back shortly.',
+
+  aiScheduleEnabled:
+    false,
+
+  aiScheduleStartAt:
+    null,
+
+  aiScheduleEndAt:
+    null,
 };
 
 function toDateInput(
@@ -537,7 +639,7 @@ export default function AdminPagesManagerPage() {
     );
   }
 
-  async function saveGlobal() {
+  function validateGlobal() {
     if (
       global.scheduleEnabled &&
       global.scheduleStartAt &&
@@ -545,8 +647,55 @@ export default function AdminPagesManagerPage() {
       global.scheduleEndAt <=
         global.scheduleStartAt
     ) {
+      return 'Full-site maintenance end time must be after the start time.';
+    }
+
+    if (
+      global.aiScheduleEnabled &&
+      global.aiScheduleStartAt &&
+      global.aiScheduleEndAt &&
+      global.aiScheduleEndAt <=
+        global.aiScheduleStartAt
+    ) {
+      return 'Global AI maintenance end time must be after the start time.';
+    }
+
+    return null;
+  }
+
+  function validatePage() {
+    if (
+      current.scheduleEnabled &&
+      current.scheduleStartAt &&
+      current.scheduleEndAt &&
+      current.scheduleEndAt <=
+        current.scheduleStartAt
+    ) {
+      return 'Page maintenance end time must be after the start time.';
+    }
+
+    if (
+      current.aiScheduleEnabled &&
+      current.aiScheduleStartAt &&
+      current.aiScheduleEndAt &&
+      current.aiScheduleEndAt <=
+        current.aiScheduleStartAt
+    ) {
+      return 'Page AI maintenance end time must be after the start time.';
+    }
+
+    return null;
+  }
+
+  async function saveGlobal() {
+    const validation =
+      validateGlobal();
+
+    if (
+      validation
+    ) {
       setNotice(
-        'Full-site maintenance end time must be after the start time.'
+        validation
       );
 
       return;
@@ -583,16 +732,18 @@ export default function AdminPagesManagerPage() {
       ) {
         throw new Error(
           data.error ||
-            'Unable to save full-site schedule.'
+            'Unable to save global maintenance settings.'
         );
       }
 
-      setGlobal(
-        data.global
-      );
+      setGlobal({
+        ...EMPTY_GLOBAL,
+        ...(data.global ||
+          global),
+      });
 
       setNotice(
-        'Full-site maintenance settings saved.'
+        'Global website and AI maintenance settings saved.'
       );
     } catch (
       error
@@ -600,7 +751,7 @@ export default function AdminPagesManagerPage() {
       setNotice(
         error instanceof Error
           ? error.message
-          : 'Unable to save schedule.'
+          : 'Unable to save global settings.'
       );
     } finally {
       setSaving(
@@ -610,31 +761,174 @@ export default function AdminPagesManagerPage() {
   }
 
   async function toggleInstantFullSiteMaintenance() {
-    const nextEnabled = !global.maintenanceEnabled;
-    setGlobal((old) => ({ ...old, maintenanceEnabled: nextEnabled }));
-    setSaving(true);
+    const nextEnabled =
+      !global.maintenanceEnabled;
+
+    setGlobal(
+      (
+        old
+      ) => ({
+        ...old,
+        maintenanceEnabled:
+          nextEnabled,
+      })
+    );
+
+    setSaving(
+      true
+    );
 
     try {
-      const response = await api('/api/admin/page-controls', {
-        method: 'POST',
-        body: JSON.stringify({
-          action: 'global',
-          ...global,
-          maintenanceEnabled: nextEnabled,
-        }),
-      });
+      const response =
+        await api(
+          '/api/admin/page-controls',
+          {
+            method:
+              'POST',
 
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Unable to change full-site maintenance.');
+            body:
+              JSON.stringify({
+                action:
+                  'global',
+
+                ...global,
+
+                maintenanceEnabled:
+                  nextEnabled,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            'Unable to change full-site maintenance.'
+        );
       }
 
-      setGlobal(data.global);
-      setNotice(nextEnabled ? '🚨 Full website maintenance is now ON.' : '✅ Full website maintenance is now OFF.');
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Unable to change maintenance mode.');
+      setGlobal({
+        ...EMPTY_GLOBAL,
+        ...(data.global ||
+          global),
+
+        maintenanceEnabled:
+          nextEnabled,
+      });
+
+      setNotice(
+        nextEnabled
+          ? '🚨 Full website maintenance is now ON.'
+          : '✅ Full website maintenance is now OFF.'
+      );
+    } catch (
+      error
+    ) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : 'Unable to change maintenance mode.'
+      );
     } finally {
-      setSaving(false);
+      setSaving(
+        false
+      );
+    }
+  }
+
+  async function toggleGlobalAiMaintenance() {
+    const nextEnabled =
+      !global.aiMaintenanceEnabled;
+
+    setGlobal(
+      (
+        old
+      ) => ({
+        ...old,
+        aiMaintenanceEnabled:
+          nextEnabled,
+      })
+    );
+
+    setSaving(
+      true
+    );
+
+    try {
+      const response =
+        await api(
+          '/api/admin/page-controls',
+          {
+            method:
+              'POST',
+
+            body:
+              JSON.stringify({
+                action:
+                  'global',
+
+                ...global,
+
+                aiMaintenanceEnabled:
+                  nextEnabled,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+            'Unable to change AI maintenance.'
+        );
+      }
+
+      setGlobal({
+        ...EMPTY_GLOBAL,
+        ...(data.global ||
+          global),
+
+        aiMaintenanceEnabled:
+          nextEnabled,
+      });
+
+      setNotice(
+        nextEnabled
+          ? '🤖 Auronix AI maintenance is now ON.'
+          : '✅ Auronix AI maintenance is now OFF.'
+      );
+    } catch (
+      error
+    ) {
+      setGlobal(
+        (
+          old
+        ) => ({
+          ...old,
+          aiMaintenanceEnabled:
+            !nextEnabled,
+        })
+      );
+
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : 'Unable to change AI maintenance.'
+      );
+    } finally {
+      setSaving(
+        false
+      );
     }
   }
 
@@ -645,15 +939,14 @@ export default function AdminPagesManagerPage() {
       return;
     }
 
+    const validation =
+      validatePage();
+
     if (
-      current.scheduleEnabled &&
-      current.scheduleStartAt &&
-      current.scheduleEndAt &&
-      current.scheduleEndAt <=
-        current.scheduleStartAt
+      validation
     ) {
       setNotice(
-        'Page maintenance end time must be after the start time.'
+        validation
       );
 
       return;
@@ -701,7 +994,17 @@ export default function AdminPagesManagerPage() {
           ...old,
 
           [selectedPage.path]:
-            data.page,
+            {
+              ...EMPTY_PAGE,
+
+              ...(
+                data.page ||
+                current
+              ),
+
+              path:
+                selectedPage.path,
+            },
         })
       );
 
@@ -723,7 +1026,11 @@ export default function AdminPagesManagerPage() {
     }
   }
 
-  async function generateGlobalMessage() {
+  async function generateGlobalMessage(
+    kind:
+      | 'website'
+      | 'ai'
+  ) {
     setAiLoading(
       true
     );
@@ -742,10 +1049,16 @@ export default function AdminPagesManagerPage() {
                   '*',
 
                 pageTitle:
-                  'Auronix Commerce website',
+                  kind ===
+                  'ai'
+                    ? 'Auronix AI'
+                    : 'Auronix Commerce website',
 
                 incident:
-                  'Scheduled full-site maintenance.',
+                  kind ===
+                  'ai'
+                    ? 'AI assistant maintenance.'
+                    : 'Scheduled full-site maintenance.',
               }),
           }
         );
@@ -763,23 +1076,46 @@ export default function AdminPagesManagerPage() {
         );
       }
 
-      setGlobal(
-        (
-          old
-        ) => ({
-          ...old,
+      if (
+        kind ===
+        'ai'
+      ) {
+        setGlobal(
+          (
+            old
+          ) => ({
+            ...old,
 
-          maintenanceTitle:
-            data.title,
+            aiMaintenanceTitle:
+              data.title,
 
-          maintenanceMessage:
-            data.message,
-        })
-      );
+            aiMaintenanceMessage:
+              data.message,
+          })
+        );
 
-      setNotice(
-        'AI generated the full-site maintenance message.'
-      );
+        setNotice(
+          'AI generated the global AI maintenance message.'
+        );
+      } else {
+        setGlobal(
+          (
+            old
+          ) => ({
+            ...old,
+
+            maintenanceTitle:
+              data.title,
+
+            maintenanceMessage:
+              data.message,
+          })
+        );
+
+        setNotice(
+          'AI generated the full-site maintenance message.'
+        );
+      }
     } catch (
       error
     ) {
@@ -795,7 +1131,11 @@ export default function AdminPagesManagerPage() {
     }
   }
 
-  async function generatePageMessage() {
+  async function generatePageMessage(
+    kind:
+      | 'website'
+      | 'ai'
+  ) {
     if (
       !selectedPage
     ) {
@@ -823,8 +1163,11 @@ export default function AdminPagesManagerPage() {
                   selectedPage.title,
 
                 incident:
-                  current.lastError ||
-                  'Scheduled page maintenance.',
+                  kind ===
+                  'ai'
+                    ? 'AI assistant maintenance for this page.'
+                    : current.lastError ||
+                      'Scheduled page maintenance.',
               }),
           }
         );
@@ -842,19 +1185,38 @@ export default function AdminPagesManagerPage() {
         );
       }
 
-      updatePage(
-        'maintenanceTitle',
-        data.title
-      );
+      if (
+        kind ===
+        'ai'
+      ) {
+        updatePage(
+          'aiMaintenanceTitle',
+          data.title
+        );
 
-      updatePage(
-        'maintenanceMessage',
-        data.message
-      );
+        updatePage(
+          'aiMaintenanceMessage',
+          data.message
+        );
 
-      setNotice(
-        'AI generated the page maintenance message.'
-      );
+        setNotice(
+          'AI generated the page AI maintenance message.'
+        );
+      } else {
+        updatePage(
+          'maintenanceTitle',
+          data.title
+        );
+
+        updatePage(
+          'maintenanceMessage',
+          data.message
+        );
+
+        setNotice(
+          'AI generated the page maintenance message.'
+        );
+      }
     } catch (
       error
     ) {
@@ -874,6 +1236,10 @@ export default function AdminPagesManagerPage() {
     <AdminLayout>
       <div className="space-y-6">
 
+        {/* ====================================================
+            HEADER
+            ==================================================== */}
+
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
 
           <div>
@@ -886,8 +1252,9 @@ export default function AdminPagesManagerPage() {
             </h1>
 
             <p className="mt-2 max-w-3xl text-sm leading-6 text-foreground-muted">
-              Schedule maintenance, monitor every page, manage
-              announcements, and control the public website.
+              Control full-site maintenance, AI maintenance,
+              page maintenance, schedules, popups, and public
+              page availability from one place.
             </p>
           </div>
 
@@ -908,15 +1275,15 @@ export default function AdminPagesManagerPage() {
           </div>
         )}
 
-        {/* FULL SITE SCHEDULE */}
+        {/* ====================================================
+            GLOBAL WEBSITE MAINTENANCE
+            ==================================================== */}
+
         <section
           className={`rounded-3xl border p-6 ${
             global.maintenanceEnabled ||
-            (
-              global.scheduleEnabled &&
-              global.scheduleStartAt
-            )
-              ? 'border-accent/30 bg-accent/5'
+            global.scheduleEnabled
+              ? 'border-red-500/30 bg-red-500/5'
               : 'border-border bg-card'
           }`}
         >
@@ -935,24 +1302,30 @@ export default function AdminPagesManagerPage() {
                   Full Website Maintenance
                 </h2>
 
+                {global.maintenanceEnabled && (
+                  <span className="rounded-full bg-red-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-red-700">
+                    ACTIVE
+                  </span>
+                )}
+
                 {global.scheduleEnabled && (
                   <span className="rounded-full bg-accent/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
-                    Scheduled
+                    SCHEDULED
                   </span>
                 )}
 
               </div>
 
               <p className="mt-2 text-sm leading-6 text-foreground-muted">
-                Schedule downtime for the entire public website.
-                Admin remains available.
+                Block the entire public website while keeping
+                all administrator routes available.
               </p>
 
               <div className="mt-5 space-y-4">
 
                 <ToggleRow
                   label="Schedule full-site maintenance"
-                  description="Visitors will see the schedule notice before the start time, then maintenance mode during the window."
+                  description="Visitors receive an upcoming notice before the start time and the full maintenance screen during the active window."
                   enabled={
                     global.scheduleEnabled
                   }
@@ -968,53 +1341,39 @@ export default function AdminPagesManagerPage() {
 
                 <div className="grid gap-4 md:grid-cols-2">
 
-                  <div>
-                    <label className="text-xs font-semibold">
-                      Start
-                    </label>
-
-                    <input
-                      type="datetime-local"
-                      value={toDateInput(
-                        global.scheduleStartAt
-                      )}
-                      onChange={(
-                        event
-                      ) =>
-                        updateGlobal(
-                          'scheduleStartAt',
-                          fromDateInput(
-                            event.target.value
-                          )
+                  <DateField
+                    label="Start"
+                    value={toDateInput(
+                      global.scheduleStartAt
+                    )}
+                    onChange={(
+                      value
+                    ) =>
+                      updateGlobal(
+                        'scheduleStartAt',
+                        fromDateInput(
+                          value
                         )
-                      }
-                      className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                    />
-                  </div>
+                      )
+                    }
+                  />
 
-                  <div>
-                    <label className="text-xs font-semibold">
-                      Finish
-                    </label>
-
-                    <input
-                      type="datetime-local"
-                      value={toDateInput(
-                        global.scheduleEndAt
-                      )}
-                      onChange={(
-                        event
-                      ) =>
-                        updateGlobal(
-                          'scheduleEndAt',
-                          fromDateInput(
-                            event.target.value
-                          )
+                  <DateField
+                    label="Finish"
+                    value={toDateInput(
+                      global.scheduleEndAt
+                    )}
+                    onChange={(
+                      value
+                    ) =>
+                      updateGlobal(
+                        'scheduleEndAt',
+                        fromDateInput(
+                          value
                         )
-                      }
-                      className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                    />
-                  </div>
+                      )
+                    }
+                  />
 
                 </div>
 
@@ -1030,7 +1389,7 @@ export default function AdminPagesManagerPage() {
                       event.target.value
                     )
                   }
-                  placeholder="Maintenance title"
+                  placeholder="Full-site maintenance title"
                   className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
                 />
 
@@ -1047,7 +1406,7 @@ export default function AdminPagesManagerPage() {
                     )
                   }
                   rows={4}
-                  placeholder="Maintenance message"
+                  placeholder="Full-site maintenance message"
                   className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm leading-6"
                 />
 
@@ -1055,14 +1414,23 @@ export default function AdminPagesManagerPage() {
 
                   <button
                     type="button"
-                    disabled={saving}
-                    onClick={toggleInstantFullSiteMaintenance}
-                    className={global.maintenanceEnabled
-                      ? 'inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-red-600/20 hover:bg-red-700 disabled:opacity-50'
-                      : 'inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-500/15 disabled:opacity-50'}
+                    disabled={
+                      saving
+                    }
+                    onClick={
+                      toggleInstantFullSiteMaintenance
+                    }
+                    className={
+                      global.maintenanceEnabled
+                        ? 'inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-red-600/20 hover:bg-red-700 disabled:opacity-50'
+                        : 'inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-500/15 disabled:opacity-50'
+                    }
                   >
                     <Zap className="h-4 w-4" />
-                    {global.maintenanceEnabled ? '🚨 Turn Full-Site Maintenance OFF' : '🚨 Instant Full-Site Maintenance ON'}
+
+                    {global.maintenanceEnabled
+                      ? '🚨 Turn Full-Site Maintenance OFF'
+                      : '🚨 Instant Full-Site Maintenance ON'}
                   </button>
 
                   <button
@@ -1070,8 +1438,10 @@ export default function AdminPagesManagerPage() {
                     disabled={
                       aiLoading
                     }
-                    onClick={
-                      generateGlobalMessage
+                    onClick={() =>
+                      generateGlobalMessage(
+                        'website'
+                      )
                     }
                     className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary disabled:opacity-50"
                   >
@@ -1081,7 +1451,7 @@ export default function AdminPagesManagerPage() {
                       <Sparkles className="h-4 w-4" />
                     )}
 
-                    Generate with AI
+                    Generate Website Message
                   </button>
 
                   <button
@@ -1100,7 +1470,7 @@ export default function AdminPagesManagerPage() {
                       <CheckCircle2 className="h-4 w-4" />
                     )}
 
-                    Save Full-Site Schedule
+                    Save Website Maintenance
                   </button>
 
                 </div>
@@ -1110,7 +1480,227 @@ export default function AdminPagesManagerPage() {
           </div>
         </section>
 
-        {/* SEARCH */}
+        {/* ====================================================
+            GLOBAL AI MAINTENANCE
+            ==================================================== */}
+
+        <section
+          className={`rounded-3xl border p-6 ${
+            global.aiMaintenanceEnabled ||
+            global.aiScheduleEnabled
+              ? 'border-violet-500/30 bg-violet-500/5'
+              : 'border-border bg-card'
+          }`}
+        >
+
+          <div className="flex items-start gap-4">
+
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-500/10">
+              <Sparkles className="h-6 w-6 text-violet-600" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+
+              <div className="flex flex-wrap items-center gap-2">
+
+                <h2 className="text-lg font-semibold">
+                  Global AI Maintenance
+                </h2>
+
+                {global.aiMaintenanceEnabled && (
+                  <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-violet-700">
+                    AI MAINTENANCE ON
+                  </span>
+                )}
+
+              </div>
+
+              <p className="mt-2 text-sm leading-6 text-foreground-muted">
+                The website remains available, but Auronix AI
+                enters maintenance mode. Visitors can press
+                Continue, but every AI request remains
+                maintenance-only on the server.
+              </p>
+
+              <div className="mt-5 space-y-4">
+
+                <ToggleRow
+                  label="AI Maintenance"
+                  description="Put the entire Auronix AI assistant into maintenance mode without disabling the website."
+                  enabled={
+                    global.aiMaintenanceEnabled
+                  }
+                  onChange={(
+                    value
+                  ) =>
+                    updateGlobal(
+                      'aiMaintenanceEnabled',
+                      value
+                    )
+                  }
+                />
+
+                <ToggleRow
+                  label="Schedule AI maintenance"
+                  description="Automatically activate AI maintenance only during the configured period."
+                  enabled={
+                    global.aiScheduleEnabled
+                  }
+                  onChange={(
+                    value
+                  ) =>
+                    updateGlobal(
+                      'aiScheduleEnabled',
+                      value
+                    )
+                  }
+                />
+
+                <div className="grid gap-4 md:grid-cols-2">
+
+                  <DateField
+                    label="AI Start"
+                    value={toDateInput(
+                      global.aiScheduleStartAt
+                    )}
+                    onChange={(
+                      value
+                    ) =>
+                      updateGlobal(
+                        'aiScheduleStartAt',
+                        fromDateInput(
+                          value
+                        )
+                      )
+                    }
+                  />
+
+                  <DateField
+                    label="AI Finish"
+                    value={toDateInput(
+                      global.aiScheduleEndAt
+                    )}
+                    onChange={(
+                      value
+                    ) =>
+                      updateGlobal(
+                        'aiScheduleEndAt',
+                        fromDateInput(
+                          value
+                        )
+                      )
+                    }
+                  />
+
+                </div>
+
+                <input
+                  value={
+                    global.aiMaintenanceTitle
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    updateGlobal(
+                      'aiMaintenanceTitle',
+                      event.target.value
+                    )
+                  }
+                  placeholder="AI maintenance title"
+                  className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                />
+
+                <textarea
+                  value={
+                    global.aiMaintenanceMessage
+                  }
+                  onChange={(
+                    event
+                  ) =>
+                    updateGlobal(
+                      'aiMaintenanceMessage',
+                      event.target.value
+                    )
+                  }
+                  rows={4}
+                  placeholder="AI maintenance message"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm leading-6"
+                />
+
+                <div className="flex flex-wrap gap-3">
+
+                  <button
+                    type="button"
+                    disabled={
+                      saving
+                    }
+                    onClick={
+                      toggleGlobalAiMaintenance
+                    }
+                    className={
+                      global.aiMaintenanceEnabled
+                        ? 'inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-violet-600/20 hover:bg-violet-700 disabled:opacity-50'
+                        : 'inline-flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-4 py-2.5 text-xs font-bold text-violet-700 hover:bg-violet-500/15 disabled:opacity-50'
+                    }
+                  >
+                    <Sparkles className="h-4 w-4" />
+
+                    {global.aiMaintenanceEnabled
+                      ? 'Turn AI Maintenance OFF'
+                      : 'Turn AI Maintenance ON'}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      aiLoading
+                    }
+                    onClick={() =>
+                      generateGlobalMessage(
+                        'ai'
+                      )
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary disabled:opacity-50"
+                  >
+                    {aiLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+
+                    Generate AI Message
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={
+                      saving
+                    }
+                    onClick={
+                      saveGlobal
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4" />
+                    )}
+
+                    Save AI Maintenance
+                  </button>
+
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ====================================================
+            SEARCH
+            ==================================================== */}
+
         <div className="relative">
 
           <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground-muted" />
@@ -1132,9 +1722,12 @@ export default function AdminPagesManagerPage() {
 
         </div>
 
-        <div className="grid gap-6 xl:grid-cols-[1fr_450px]">
+        <div className="grid gap-6 xl:grid-cols-[1fr_500px]">
 
-          {/* PAGE LIST */}
+          {/* ==================================================
+              PAGE LIST
+              ================================================== */}
+
           <div className="space-y-3">
 
             {filtered.map(
@@ -1167,7 +1760,7 @@ export default function AdminPagesManagerPage() {
                         page.path
                       )
                     }
-                    className={`w-full rounded-2xl border p-5 text-left ${
+                    className={`w-full rounded-2xl border p-5 text-left transition ${
                       selected ===
                       page.path
                         ? 'border-accent bg-accent/5'
@@ -1177,7 +1770,7 @@ export default function AdminPagesManagerPage() {
 
                     <div className="flex items-center justify-between gap-4">
 
-                      <div>
+                      <div className="min-w-0">
 
                         <div className="font-semibold">
                           {
@@ -1193,7 +1786,7 @@ export default function AdminPagesManagerPage() {
 
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex shrink-0 items-center gap-2">
 
                         {control.scheduleEnabled && (
                           <CalendarClock className="h-4 w-4 text-accent" />
@@ -1203,6 +1796,10 @@ export default function AdminPagesManagerPage() {
                           <Wrench className="h-4 w-4 text-red-600" />
                         ) : (
                           <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        )}
+
+                        {control.aiMaintenanceEnabled && (
+                          <Sparkles className="h-4 w-4 text-violet-600" />
                         )}
 
                       </div>
@@ -1216,7 +1813,10 @@ export default function AdminPagesManagerPage() {
 
           </div>
 
-          {/* PAGE EDITOR */}
+          {/* ==================================================
+              PAGE EDITOR
+              ================================================== */}
+
           <div className="rounded-3xl border border-border bg-card p-6">
 
             {selectedPage && (
@@ -1240,7 +1840,10 @@ export default function AdminPagesManagerPage() {
                   </p>
                 </div>
 
-                {/* PAGE SCHEDULE */}
+                {/* ============================================
+                    PAGE WEBSITE SCHEDULE
+                    ============================================ */}
+
                 <div className="mt-6 rounded-2xl border border-border p-5">
 
                   <div className="flex items-center gap-2">
@@ -1252,16 +1855,15 @@ export default function AdminPagesManagerPage() {
                   </div>
 
                   <p className="mt-1 text-xs leading-5 text-foreground-muted">
-                    This schedule applies only to this page. The schedule
-                    banner is also shown on Home so visitors know this
-                    page will be unavailable.
+                    Schedule downtime for this page only.
+                    Home can show visitors the upcoming schedule.
                   </p>
 
                   <div className="mt-5 space-y-4">
 
                     <ToggleRow
                       label="Schedule this page"
-                      description="Show a countdown before maintenance and an expected-finish timer during maintenance."
+                      description="Activate page maintenance automatically during the scheduled window."
                       enabled={
                         current.scheduleEnabled
                       }
@@ -1275,55 +1877,41 @@ export default function AdminPagesManagerPage() {
                       }
                     />
 
-                    <div className="grid gap-4">
+                    <div className="grid gap-4 md:grid-cols-2">
 
-                      <div>
-                        <label className="text-xs font-semibold">
-                          Start
-                        </label>
-
-                        <input
-                          type="datetime-local"
-                          value={toDateInput(
-                            current.scheduleStartAt
-                          )}
-                          onChange={(
-                            event
-                          ) =>
-                            updatePage(
-                              'scheduleStartAt',
-                              fromDateInput(
-                                event.target.value
-                              )
+                      <DateField
+                        label="Start"
+                        value={toDateInput(
+                          current.scheduleStartAt
+                        )}
+                        onChange={(
+                          value
+                        ) =>
+                          updatePage(
+                            'scheduleStartAt',
+                            fromDateInput(
+                              value
                             )
-                          }
-                          className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                        />
-                      </div>
+                          )
+                        }
+                      />
 
-                      <div>
-                        <label className="text-xs font-semibold">
-                          Finish
-                        </label>
-
-                        <input
-                          type="datetime-local"
-                          value={toDateInput(
-                            current.scheduleEndAt
-                          )}
-                          onChange={(
-                            event
-                          ) =>
-                            updatePage(
-                              'scheduleEndAt',
-                              fromDateInput(
-                                event.target.value
-                              )
+                      <DateField
+                        label="Finish"
+                        value={toDateInput(
+                          current.scheduleEndAt
+                        )}
+                        onChange={(
+                          value
+                        ) =>
+                          updatePage(
+                            'scheduleEndAt',
+                            fromDateInput(
+                              value
                             )
-                          }
-                          className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
-                        />
-                      </div>
+                          )
+                        }
+                      />
 
                     </div>
 
@@ -1331,24 +1919,39 @@ export default function AdminPagesManagerPage() {
 
                 </div>
 
-                {/* MAINTENANCE */}
+                {/* ============================================
+                    PAGE WEBSITE MAINTENANCE
+                    ============================================ */}
+
                 <div className="mt-5 rounded-2xl border border-border p-5">
 
-                  <ToggleRow
-                    label="Maintenance"
-                    description="Manually keep this page under maintenance."
-                    enabled={
-                      current.maintenanceEnabled
-                    }
-                    onChange={(
-                      value
-                    ) =>
-                      updatePage(
-                        'maintenanceEnabled',
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-red-600" />
+
+                    <h3 className="font-semibold">
+                      Page Maintenance
+                    </h3>
+                  </div>
+
+                  <div className="mt-4">
+
+                    <ToggleRow
+                      label="Maintenance"
+                      description="Manually keep this page under maintenance."
+                      enabled={
+                        current.maintenanceEnabled
+                      }
+                      onChange={(
                         value
-                      )
-                    }
-                  />
+                      ) =>
+                        updatePage(
+                          'maintenanceEnabled',
+                          value
+                        )
+                      }
+                    />
+
+                  </div>
 
                   <input
                     value={
@@ -1388,8 +1991,10 @@ export default function AdminPagesManagerPage() {
                     disabled={
                       aiLoading
                     }
-                    onClick={
-                      generatePageMessage
+                    onClick={() =>
+                      generatePageMessage(
+                        'website'
+                      )
                     }
                     className="mt-3 inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary disabled:opacity-50"
                   >
@@ -1404,24 +2009,203 @@ export default function AdminPagesManagerPage() {
 
                 </div>
 
-                {/* POPUP */}
+                {/* ============================================
+                    PAGE AI MAINTENANCE
+                    ============================================ */}
+
+                <div
+                  className={`mt-5 rounded-2xl border p-5 ${
+                    current.aiMaintenanceEnabled ||
+                    current.aiScheduleEnabled
+                      ? 'border-violet-500/30 bg-violet-500/5'
+                      : 'border-border'
+                  }`}
+                >
+
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-violet-600" />
+
+                    <h3 className="font-semibold">
+                      Page AI Maintenance
+                    </h3>
+
+                  </div>
+
+                  <p className="mt-1 text-xs leading-5 text-foreground-muted">
+                    The page itself stays available, but AI
+                    enters maintenance mode only when visitors
+                    are chatting from this page.
+                  </p>
+
+                  <div className="mt-5 space-y-4">
+
+                    <ToggleRow
+                      label="AI Maintenance"
+                      description="Restrict AI to the maintenance response for this page."
+                      enabled={
+                        current.aiMaintenanceEnabled
+                      }
+                      onChange={(
+                        value
+                      ) =>
+                        updatePage(
+                          'aiMaintenanceEnabled',
+                          value
+                        )
+                      }
+                    />
+
+                    <ToggleRow
+                      label="Schedule AI maintenance"
+                      description="Automatically activate page AI maintenance during the configured period."
+                      enabled={
+                        current.aiScheduleEnabled
+                      }
+                      onChange={(
+                        value
+                      ) =>
+                        updatePage(
+                          'aiScheduleEnabled',
+                          value
+                        )
+                      }
+                    />
+
+                    <div className="grid gap-4 md:grid-cols-2">
+
+                      <DateField
+                        label="AI Start"
+                        value={toDateInput(
+                          current.aiScheduleStartAt
+                        )}
+                        onChange={(
+                          value
+                        ) =>
+                          updatePage(
+                            'aiScheduleStartAt',
+                            fromDateInput(
+                              value
+                            )
+                          )
+                        }
+                      />
+
+                      <DateField
+                        label="AI Finish"
+                        value={toDateInput(
+                          current.aiScheduleEndAt
+                        )}
+                        onChange={(
+                          value
+                        ) =>
+                          updatePage(
+                            'aiScheduleEndAt',
+                            fromDateInput(
+                              value
+                            )
+                          )
+                        }
+                      />
+
+                    </div>
+
+                    <input
+                      value={
+                        current.aiMaintenanceTitle
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        updatePage(
+                          'aiMaintenanceTitle',
+                          event.target.value
+                        )
+                      }
+                      placeholder="AI maintenance title"
+                      className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    />
+
+                    <textarea
+                      value={
+                        current.aiMaintenanceMessage
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        updatePage(
+                          'aiMaintenanceMessage',
+                          event.target.value
+                        )
+                      }
+                      rows={4}
+                      placeholder="AI maintenance message"
+                      className="w-full rounded-xl border border-border bg-background px-3 py-3 text-sm leading-6"
+                    />
+
+                    <button
+                      type="button"
+                      disabled={
+                        aiLoading
+                      }
+                      onClick={() =>
+                        generatePageMessage(
+                          'ai'
+                        )
+                      }
+                      className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-xs font-semibold hover:bg-secondary disabled:opacity-50"
+                    >
+                      {aiLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+
+                      Generate AI Maintenance Message
+                    </button>
+
+                  </div>
+
+                </div>
+
+                {/* ============================================
+                    PAGE POPUP
+                    ============================================ */}
+
                 <div className="mt-5 rounded-2xl border border-border p-5">
 
-                  <ToggleRow
-                    label="Page Popup"
-                    description="Show a dedicated popup on this page."
-                    enabled={
-                      current.popupEnabled
-                    }
-                    onChange={(
-                      value
-                    ) =>
-                      updatePage(
-                        'popupEnabled',
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-accent" />
+
+                    <h3 className="font-semibold">
+                      Page Popup
+                    </h3>
+                  </div>
+
+                  <p className="mt-1 text-xs leading-5 text-foreground-muted">
+                    This is the existing dedicated page popup.
+                    It is independent from website and AI
+                    maintenance.
+                  </p>
+
+                  <div className="mt-4">
+
+                    <ToggleRow
+                      label="Page Popup"
+                      description="Show a dedicated popup on this page."
+                      enabled={
+                        current.popupEnabled
+                      }
+                      onChange={(
                         value
-                      )
-                    }
-                  />
+                      ) =>
+                        updatePage(
+                          'popupEnabled',
+                          value
+                        )
+                      }
+                    />
+
+                  </div>
 
                   <input
                     value={
@@ -1453,10 +2237,252 @@ export default function AdminPagesManagerPage() {
                     }
                     rows={4}
                     placeholder="Popup content"
-                    className="mt-3 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm"
+                    className="mt-3 w-full rounded-xl border border-border bg-background px-3 py-3 text-sm leading-6"
                   />
 
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+
+                    <input
+                      value={
+                        current.popupButtonText
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        updatePage(
+                          'popupButtonText',
+                          event.target.value
+                        )
+                      }
+                      placeholder="Button text"
+                      className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    />
+
+                    <input
+                      value={
+                        current.popupButtonUrl
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        updatePage(
+                          'popupButtonUrl',
+                          event.target.value
+                        )
+                      }
+                      placeholder="Button URL"
+                      className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                    />
+
+                  </div>
+
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+
+                    <div>
+                      <label className="text-xs font-semibold">
+                        Frequency
+                      </label>
+
+                      <select
+                        value={
+                          current.popupFrequency
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          updatePage(
+                            'popupFrequency',
+                            event.target.value
+                          )
+                        }
+                        className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                      >
+                        <option value="once">
+                          Once
+                        </option>
+
+                        <option value="session">
+                          Session
+                        </option>
+
+                        <option value="always">
+                          Always
+                        </option>
+                      </select>
+                    </div>
+
+                    <DateField
+                      label="Popup Until"
+                      value={toDateInput(
+                        current.popupUntilAt
+                      )}
+                      onChange={(
+                        value
+                      ) =>
+                        updatePage(
+                          'popupUntilAt',
+                          fromDateInput(
+                            value
+                          )
+                        )
+                      }
+                    />
+
+                  </div>
+
                 </div>
+
+                {/* ============================================
+                    HEALTH / AUTOMATION
+                    ============================================ */}
+
+                <div className="mt-5 rounded-2xl border border-border p-5">
+
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-accent" />
+
+                    <h3 className="font-semibold">
+                      Automation & Health
+                    </h3>
+                  </div>
+
+                  <div className="mt-5 space-y-4">
+
+                    <ToggleRow
+                      label="Automatic maintenance"
+                      description="Allow health monitoring to place this page into maintenance after repeated failures."
+                      enabled={
+                        current.automaticMaintenanceEnabled
+                      }
+                      onChange={(
+                        value
+                      ) =>
+                        updatePage(
+                          'automaticMaintenanceEnabled',
+                          value
+                        )
+                      }
+                    />
+
+                    <ToggleRow
+                      label="Automatic recovery"
+                      description="Allow the system to recover the page when health checks become healthy again."
+                      enabled={
+                        current.automaticRecoveryEnabled
+                      }
+                      onChange={(
+                        value
+                      ) =>
+                        updatePage(
+                          'automaticRecoveryEnabled',
+                          value
+                        )
+                      }
+                    />
+
+                    <ToggleRow
+                      label="Admin bypass"
+                      description="Allow authenticated administrators to preview or access this page while it is under maintenance."
+                      enabled={
+                        current.adminBypassEnabled
+                      }
+                      onChange={(
+                        value
+                      ) =>
+                        updatePage(
+                          'adminBypassEnabled',
+                          value
+                        )
+                      }
+                    />
+
+                    <div className="grid gap-4 md:grid-cols-3">
+
+                      <div>
+                        <label className="text-xs font-semibold">
+                          Failure threshold
+                        </label>
+
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          value={
+                            current.failureThreshold
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            updatePage(
+                              'failureThreshold',
+                              Math.max(
+                                1,
+                                Number(
+                                  event.target.value ||
+                                    1
+                                )
+                              )
+                            )
+                          }
+                          className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold">
+                          Health score
+                        </label>
+
+                        <div className="mt-2 flex h-11 items-center rounded-xl border border-border bg-secondary/30 px-3 text-sm font-bold">
+                          {
+                            current.healthScore
+                          }
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold">
+                          Status
+                        </label>
+
+                        <div className="mt-2 flex h-11 items-center rounded-xl border border-border bg-secondary/30 px-3 text-sm font-semibold">
+                          {
+                            current.healthStatus
+                          }
+                        </div>
+                      </div>
+
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-secondary/20 p-4">
+
+                      <div className="text-xs font-semibold">
+                        Consecutive failures
+                      </div>
+
+                      <div className="mt-1 text-2xl font-bold">
+                        {
+                          current.consecutiveFailures
+                        }
+                      </div>
+
+                      {current.lastError && (
+                        <div className="mt-2 rounded-lg bg-red-500/5 px-3 py-2 text-xs leading-5 text-red-700">
+                          {
+                            current.lastError
+                          }
+                        </div>
+                      )}
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* ============================================
+                    PAGE ACTIONS
+                    ============================================ */}
 
                 <div className="mt-5 flex flex-wrap gap-3">
 
@@ -1496,6 +2522,7 @@ export default function AdminPagesManagerPage() {
             )}
 
           </div>
+
         </div>
 
         {loading && (
@@ -1507,6 +2534,37 @@ export default function AdminPagesManagerPage() {
 
       </div>
     </AdminLayout>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (
+    value: string
+  ) => void;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-semibold">
+        {label}
+      </label>
+
+      <input
+        type="datetime-local"
+        value={value}
+        onChange={(event) =>
+          onChange(
+            event.target.value
+          )
+        }
+        className="mt-2 h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+      />
+    </div>
   );
 }
 
@@ -1526,17 +2584,13 @@ function ToggleRow({
   return (
     <div className="flex items-start justify-between gap-4">
 
-      <div>
+      <div className="min-w-0">
         <div className="text-sm font-semibold">
-          {
-            label
-          }
+          {label}
         </div>
 
         <p className="mt-1 max-w-md text-xs leading-5 text-foreground-muted">
-          {
-            description
-          }
+          {description}
         </p>
       </div>
 
@@ -1568,5 +2622,3 @@ function ToggleRow({
     </div>
   );
 }
-
-

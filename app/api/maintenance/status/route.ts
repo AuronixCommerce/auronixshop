@@ -1,153 +1,55 @@
-﻿import { NextResponse } from 'next/server';
+﻿import {
+  NextResponse,
+} from 'next/server';
 
 import {
   getMaintenanceContext,
 } from '@/lib/server-maintenance-context';
 
-function strictFlag(
-  value: unknown
-): boolean {
-  return (
-    value === true ||
-    value === 1 ||
-    value === '1' ||
-    value === 'true' ||
-    value === 'TRUE' ||
-    value === 'True'
-  );
-}
-
-function timestamp(
-  value: unknown
-): number | null {
-  if (
-    typeof value !== 'number' ||
-    !Number.isFinite(value)
-  ) {
-    return null;
-  }
-
-  return value;
-}
-
-export const runtime = 'nodejs';
+export const runtime =
+  'nodejs';
 
 export async function GET(
   request: Request
 ) {
-  try {
-    const url =
-      new URL(request.url);
+  const url =
+    new URL(
+      request.url
+    );
 
-    const pathname =
-      url.searchParams.get(
-        'path'
-      ) || '/';
+  const pathname =
+    url.searchParams.get(
+      'path'
+    ) || '/';
 
-    /*
-     * Never expose admin maintenance
-     * state as a public maintenance target.
-     */
-    if (
-      pathname === '/admin' ||
-      pathname.startsWith('/admin/')
-    ) {
-      return NextResponse.json(
-        {
-          success: true,
-
-          bypass: true,
-
-          global: {
-            active: false,
-            upcoming: false,
-            startAt: null,
-            endAt: null,
-          },
-
-          page: {
-            active: false,
-            upcoming: false,
-            startAt: null,
-            endAt: null,
-          },
-        },
-        {
-          status: 200,
-
-          headers: {
-            'Cache-Control':
-              'no-store, no-cache, must-revalidate',
-          },
-        }
-      );
-    }
-
-    const context =
-      await getMaintenanceContext(
-        pathname
-      );
-
-    const global =
-      context?.global || {};
-
-    const page =
-      context?.page || {};
-
+  /*
+   * Admin is ALWAYS outside public
+   * maintenance.
+   */
+  if (
+    pathname === '/admin' ||
+    pathname.startsWith(
+      '/admin/'
+    )
+  ) {
     return NextResponse.json(
       {
         success: true,
 
-        bypass: false,
+        bypass: true,
 
         global: {
-          active:
-            strictFlag(
-              global.active
-            ),
-
-          upcoming:
-            strictFlag(
-              global.upcoming
-            ),
-
-          startAt:
-            timestamp(
-              global.startAt
-            ),
-
-          endAt:
-            timestamp(
-              global.endAt
-            ),
+          active: false,
+          upcoming: false,
+          startAt: null,
+          endAt: null,
         },
 
         page: {
-          active:
-            strictFlag(
-              page.active
-            ),
-
-          upcoming:
-            strictFlag(
-              page.upcoming
-            ),
-
-          startAt:
-            timestamp(
-              page.startAt
-            ),
-
-          endAt:
-            timestamp(
-              page.endAt
-            ),
-
-          path:
-            typeof page.path ===
-            'string'
-              ? page.path
-              : pathname,
+          active: false,
+          upcoming: false,
+          startAt: null,
+          endAt: null,
         },
       },
       {
@@ -159,17 +61,46 @@ export async function GET(
         },
       }
     );
-  } catch (error) {
+  }
+
+  try {
+    const context =
+      await getMaintenanceContext(
+        pathname
+      );
+
+    return NextResponse.json(
+      {
+        success: true,
+
+        bypass: false,
+
+        global:
+          context.global,
+
+        page:
+          context.page,
+
+        checkedAt:
+          Date.now(),
+      },
+      {
+        status: 200,
+
+        headers: {
+          'Cache-Control':
+            'no-store, no-cache, must-revalidate',
+        },
+      }
+    );
+  } catch (
+    error
+  ) {
     console.error(
-      '[Maintenance Status]',
+      '[Auronix Maintenance Status] FAILED:',
       error
     );
 
-    /*
-     * Fail open.
-     * A failure in the maintenance-check
-     * service must NOT take down the site.
-     */
     return NextResponse.json(
       {
         success: false,
@@ -184,18 +115,33 @@ export async function GET(
         },
 
         page: {
+          path:
+            pathname,
+
           active: false,
           upcoming: false,
           startAt: null,
           endAt: null,
         },
+
+        /*
+         * Only exposed while developing locally.
+         * Never expose database credentials.
+         */
+        error:
+          process.env.NODE_ENV ===
+          'development'
+            ? error instanceof Error
+              ? error.message
+              : String(error)
+            : 'Maintenance service unavailable.',
       },
       {
-        status: 200,
+        status: 500,
 
         headers: {
           'Cache-Control':
-            'no-store',
+            'no-store, no-cache, must-revalidate',
         },
       }
     );

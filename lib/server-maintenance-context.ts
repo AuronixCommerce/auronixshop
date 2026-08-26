@@ -9,13 +9,23 @@ import {
   isScheduleUpcoming,
 } from '@/lib/page-controls';
 
+function strictBoolean(
+  value: unknown
+): boolean {
+  return (
+    value === true ||
+    value === 1 ||
+    value === '1' ||
+    value === 'true' ||
+    value === 'TRUE' ||
+    value === 'True'
+  );
+}
+
 function decodeKey(
   key: string
 ): string {
-  if (
-    key ===
-    'home'
-  ) {
+  if (key === 'home') {
     return '/';
   }
 
@@ -28,14 +38,34 @@ function decodeKey(
   );
 }
 
+function timestamp(
+  value: unknown
+): number | null {
+  if (
+    typeof value !== 'number' ||
+    !Number.isFinite(value)
+  ) {
+    return null;
+  }
+
+  return value;
+}
+
+function text(
+  value: unknown,
+  fallback = ''
+): string {
+  return typeof value === 'string'
+    ? value
+    : fallback;
+}
+
 export async function getMaintenanceContext(
   pathname = '/'
 ) {
   const snapshot =
     await adminDb
-      .ref(
-        'sitePageControls'
-      )
+      .ref('sitePageControls')
       .get();
 
   const data =
@@ -45,57 +75,37 @@ export async function getMaintenanceContext(
 
   const global = {
     ...DEFAULT_GLOBAL_CONTROL,
+    ...(data?.global || {}),
+  } as any;
 
-    ...(data?.global ||
-      {}),
-  };
-
-  let page =
-    {
-      ...DEFAULT_PAGE_CONTROL,
-
-      path:
-        pathname,
-    };
+  let page = {
+    ...DEFAULT_PAGE_CONTROL,
+    path: pathname,
+  } as any;
 
   if (
     data?.pages &&
-    typeof data.pages ===
-      'object'
+    typeof data.pages === 'object'
   ) {
     const pages =
-      data.pages as Record<
-        string,
-        any
-      >;
+      data.pages as Record<string, any>;
 
     for (
       const [
         key,
         value,
-      ] of Object.entries(
-        pages
-      )
+      ] of Object.entries(pages)
     ) {
       const path =
-        typeof value?.path ===
-        'string'
+        typeof value?.path === 'string'
           ? value.path
-          : decodeKey(
-              key
-            );
+          : decodeKey(key);
 
-      if (
-        path ===
-        pathname
-      ) {
+      if (path === pathname) {
         page = {
           ...DEFAULT_PAGE_CONTROL,
-
-          ...value,
-
-          path:
-            pathname,
+          ...(value || {}),
+          path: pathname,
         };
 
         break;
@@ -103,53 +113,154 @@ export async function getMaintenanceContext(
     }
   }
 
-  const now =
-    Date.now();
+  const now = Date.now();
+
+  const globalMaintenanceEnabled =
+    strictBoolean(
+      global.maintenanceEnabled
+    );
+
+  const globalScheduleEnabled =
+    strictBoolean(
+      global.scheduleEnabled
+    );
+
+  const pageMaintenanceEnabled =
+    strictBoolean(
+      page.maintenanceEnabled
+    );
+
+  const pageScheduleEnabled =
+    strictBoolean(
+      page.scheduleEnabled
+    );
+
+  const globalAiMaintenanceEnabled =
+    strictBoolean(
+      global.aiMaintenanceEnabled
+    );
+
+  const globalAiScheduleEnabled =
+    strictBoolean(
+      global.aiScheduleEnabled
+    );
+
+  const pageAiMaintenanceEnabled =
+    strictBoolean(
+      page.aiMaintenanceEnabled
+    );
+
+  const pageAiScheduleEnabled =
+    strictBoolean(
+      page.aiScheduleEnabled
+    );
 
   const globalActive =
-    Boolean(
-      global.maintenanceEnabled ||
-        (
-          global.scheduleEnabled &&
-          isScheduleActive(
-            global.scheduleStartAt,
-            global.scheduleEndAt,
-            now
-          )
-        )
+    globalMaintenanceEnabled ||
+    (
+      globalScheduleEnabled &&
+      isScheduleActive(
+        timestamp(
+          global.scheduleStartAt
+        ),
+        timestamp(
+          global.scheduleEndAt
+        ),
+        now
+      )
     );
 
   const globalUpcoming =
-    Boolean(
-      global.scheduleEnabled &&
-        isScheduleUpcoming(
-          global.scheduleStartAt,
-          global.scheduleEndAt,
-          now
-        )
+    globalScheduleEnabled &&
+    isScheduleUpcoming(
+      timestamp(
+        global.scheduleStartAt
+      ),
+      timestamp(
+        global.scheduleEndAt
+      ),
+      now
     );
 
   const pageActive =
-    Boolean(
-      page.maintenanceEnabled ||
-        (
-          page.scheduleEnabled &&
-          isScheduleActive(
-            page.scheduleStartAt,
-            page.scheduleEndAt,
-            now
-          )
-        )
+    pageMaintenanceEnabled ||
+    (
+      pageScheduleEnabled &&
+      isScheduleActive(
+        timestamp(
+          page.scheduleStartAt
+        ),
+        timestamp(
+          page.scheduleEndAt
+        ),
+        now
+      )
     );
 
   const pageUpcoming =
-    Boolean(
-      page.scheduleEnabled &&
-        isScheduleUpcoming(
-          page.scheduleStartAt,
-          page.scheduleEndAt,
-          now
-        )
+    pageScheduleEnabled &&
+    isScheduleUpcoming(
+      timestamp(
+        page.scheduleStartAt
+      ),
+      timestamp(
+        page.scheduleEndAt
+      ),
+      now
+    );
+
+  const globalAiActive =
+    globalAiMaintenanceEnabled ||
+    (
+      globalAiScheduleEnabled &&
+      isScheduleActive(
+        timestamp(
+          global.aiScheduleStartAt
+        ),
+        timestamp(
+          global.aiScheduleEndAt
+        ),
+        now
+      )
+    );
+
+  const globalAiUpcoming =
+    globalAiScheduleEnabled &&
+    isScheduleUpcoming(
+      timestamp(
+        global.aiScheduleStartAt
+      ),
+      timestamp(
+        global.aiScheduleEndAt
+      ),
+      now
+    );
+
+  const pageAiActive =
+    pageAiMaintenanceEnabled ||
+    (
+      pageAiScheduleEnabled &&
+      isScheduleActive(
+        timestamp(
+          page.aiScheduleStartAt
+        ),
+        timestamp(
+          page.aiScheduleEndAt
+        ),
+        now
+      )
+    );
+
+  const pageAiUpcoming =
+    pageAiScheduleEnabled &&
+    isScheduleUpcoming(
+      timestamp(
+        page.aiScheduleStartAt
+      ),
+      timestamp(
+        page.aiScheduleEndAt
+      ),
+      now
     );
 
   return {
@@ -157,39 +268,140 @@ export async function getMaintenanceContext(
 
     global: {
       scheduled:
-        global.scheduleEnabled,
+        globalScheduleEnabled,
 
       upcoming:
-        globalUpcoming,
+        Boolean(globalUpcoming),
 
       active:
-        globalActive,
+        Boolean(globalActive),
 
       startAt:
-        global.scheduleStartAt,
+        timestamp(
+          global.scheduleStartAt
+        ),
 
       endAt:
-        global.scheduleEndAt,
+        timestamp(
+          global.scheduleEndAt
+        ),
+
+      title:
+        text(
+          global.maintenanceTitle,
+          'Website Maintenance'
+        ),
+
+      message:
+        text(
+          global.maintenanceMessage,
+          'Auronix Commerce is currently undergoing maintenance.'
+        ),
+
+      aiMaintenanceEnabled:
+        globalAiMaintenanceEnabled,
+
+      aiActive:
+        Boolean(
+          globalAiActive
+        ),
+
+      aiUpcoming:
+        Boolean(
+          globalAiUpcoming
+        ),
+
+      aiStartAt:
+        timestamp(
+          global.aiScheduleStartAt
+        ),
+
+      aiEndAt:
+        timestamp(
+          global.aiScheduleEndAt
+        ),
+
+      aiTitle:
+        text(
+          global.aiMaintenanceTitle,
+          'Auronix AI Maintenance'
+        ),
+
+      aiMessage:
+        text(
+          global.aiMaintenanceMessage,
+          'Auronix AI is temporarily under maintenance.'
+        ),
     },
 
     page: {
-      path:
-        pathname,
+      path: pathname,
 
       scheduled:
-        page.scheduleEnabled,
+        pageScheduleEnabled,
 
       upcoming:
-        pageUpcoming,
+        Boolean(pageUpcoming),
 
       active:
-        pageActive,
+        Boolean(pageActive),
 
       startAt:
-        page.scheduleStartAt,
+        timestamp(
+          page.scheduleStartAt
+        ),
 
       endAt:
-        page.scheduleEndAt,
+        timestamp(
+          page.scheduleEndAt
+        ),
+
+      title:
+        text(
+          page.maintenanceTitle,
+          'Page Maintenance'
+        ),
+
+      message:
+        text(
+          page.maintenanceMessage,
+          `The page ${pathname} is currently undergoing maintenance.`
+        ),
+
+      aiMaintenanceEnabled:
+        pageAiMaintenanceEnabled,
+
+      aiActive:
+        Boolean(
+          pageAiActive
+        ),
+
+      aiUpcoming:
+        Boolean(
+          pageAiUpcoming
+        ),
+
+      aiStartAt:
+        timestamp(
+          page.aiScheduleStartAt
+        ),
+
+      aiEndAt:
+        timestamp(
+          page.aiScheduleEndAt
+        ),
+
+      aiTitle:
+        text(
+          page.aiMaintenanceTitle,
+          'AI Maintenance'
+        ),
+
+      aiMessage:
+        text(
+          page.aiMaintenanceMessage,
+          'Auronix AI is temporarily under maintenance.'
+        ),
     },
   };
 }
