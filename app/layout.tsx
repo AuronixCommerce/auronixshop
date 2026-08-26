@@ -1,24 +1,53 @@
-import './globals.css';
+﻿import './globals.css';
 import './mobile-responsive.css';
 
-import type { Metadata } from 'next';
+import type {
+  Metadata,
+} from 'next';
 
-import { Inter } from 'next/font/google';
+import {
+  Inter,
+} from 'next/font/google';
 
-import { Toaster } from '@/components/ui/toaster';
-import { AIChat } from '@/components/site/ai-chat';
-import { ScrollTextEffects } from '@/components/site/scroll-text-effects';
-import { SiteAnnouncementPopup } from '@/components/site/site-announcement-popup';
-import { PublicSiteChrome } from '@/components/site/public-site-chrome';
-import { PageControlOverlay } from '@/components/site/page-control-overlay';
-import { ServerMaintenanceGate } from '@/components/site/server-maintenance-gate';
+import {
+  Toaster,
+} from '@/components/ui/toaster';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-  preload: true,
-});
+import {
+  AIChat,
+} from '@/components/site/ai-chat';
+
+import {
+  ScrollTextEffects,
+} from '@/components/site/scroll-text-effects';
+
+import {
+  SiteAnnouncementPopup,
+} from '@/components/site/site-announcement-popup';
+
+import {
+  PublicSiteChrome,
+} from '@/components/site/public-site-chrome';
+
+import {
+  PublicRuntime,
+} from '@/components/site/public-runtime';
+
+const inter =
+  Inter({
+    subsets: [
+      'latin',
+    ],
+
+    variable:
+      '--font-inter',
+
+    display:
+      'swap',
+
+    preload:
+      true,
+  });
 
 export const metadata: Metadata = {
   metadataBase:
@@ -43,40 +72,28 @@ export const metadata: Metadata = {
       'https://auronixcommerce.com/',
   },
 
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url:
-      'https://auronixcommerce.com/',
-    siteName:
-      'Auronix Commerce LLC',
-    title:
-      'Auronix Commerce LLC | eCommerce, Procurement & Marketplace Operations',
-    description:
-      'Auronix Commerce LLC connects quality suppliers, brands, and products through structured procurement, sourcing, distribution, and modern marketplace operations.',
-  },
-
-  twitter: {
-    card:
-      'summary_large_image',
-
-    title:
-      'Auronix Commerce LLC | eCommerce, Procurement & Marketplace Operations',
-
-    description:
-      'Auronix Commerce LLC connects quality suppliers, brands, and products through structured procurement, sourcing, distribution, and modern marketplace operations.',
-  },
-
   robots: {
-    index: true,
-    follow: true,
+    index:
+      true,
+
+    follow:
+      true,
 
     googleBot: {
-      index: true,
-      follow: true,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-      'max-video-preview': -1,
+      index:
+        true,
+
+      follow:
+        true,
+
+      'max-image-preview':
+        'large',
+
+      'max-snippet':
+        -1,
+
+      'max-video-preview':
+        -1,
     },
   },
 };
@@ -84,12 +101,15 @@ export const metadata: Metadata = {
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }) {
   return (
     <html
       lang="en"
-      className={inter.variable}
+      className={
+        inter.variable
+      }
       suppressHydrationWarning
     >
       <head>
@@ -111,19 +131,9 @@ export default function RootLayout({
             'var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
       >
-        <ServerMaintenanceGate>
-          <PageControlOverlay>
-            <PublicSiteChrome>
-              {children}
-            </PublicSiteChrome>
-          </PageControlOverlay>
-        </ServerMaintenanceGate>
-
-        <SiteAnnouncementPopup />
-
-        <ScrollTextEffects />
-
-        <AIChat />
+        <PublicRuntime>
+          {children}
+        </PublicRuntime>
 
         <Toaster />
       </body>
