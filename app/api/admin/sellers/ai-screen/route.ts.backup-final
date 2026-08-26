@@ -1,0 +1,1150 @@
+﻿import { NextResponse } from 'next/server';
+
+import { requireAdmin } from '@/lib/server-auth';
+import { adminDb } from '@/lib/firebase-admin';
+import { generateGroqResponse } from '@/lib/server-groq';
+
+type ScreeningLabel =
+  | 'AI_APPROVED'
+  | 'LOOKS_GOOD'
+  | 'NEEDS_REVIEW'
+  | 'LOOKS_BUG'
+  | 'LOOKS_SPAM'
+  | 'HIGH_RISK';
+
+type Recommendation =
+  | 'AUTO_ONBOARD'
+  | 'MANUAL_REVIEW'
+  | 'DO_NOT_AUTO_APPROVE';
+
+interface ScreeningResult {
+  label: ScreeningLabel;
+  score: number;
+  summary: string;
+  reasons: string[];
+  positiveSignals: string[];
+  riskSignals: string[];
+  missingInformation: string[];
+  contradictions: string[];
+  recommendation: Recommendation;
+  autoEligible: boolean;
+}
+
+interface SellerApplication {
+  fullName: string;
+  businessName: string;
+  businessEmail: string;
+  phone: string;
+  country: string;
+
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+
+  website: string;
+  businessType: string;
+  yearsInBusiness: string;
+  productCategories: string;
+
+  businessInformation: string;
+  whyWorkWithAuronix: string;
+
+  catalogUrl: string;
+  contactAgreement: boolean;
+}
+
+function text(value: unknown): string {
+  if (
+    typeof value === 'string' ||
+    typeof value === 'number'
+  ) {
+    return String(value).trim();
+  }
+
+  return '';
+}
+
+function bool(value: unknown): boolean {
+  return (
+    value === true ||
+    value === 'true' ||
+    value === 1 ||
+    value === '1'
+  );
+}
+
+function unique(values: string[]): string[] {
+  return [...new Set(
+    values
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )];
+}
+
+function normalizeScore(value: unknown): number {
+  const score = Number(value);
+
+  if (!Number.isFinite(score)) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(score)
+    )
+  );
+}
+
+function parseJson(
+  raw: string
+): ScreeningResult | null {
+  const cleaned = raw
+    .replace(/^```json/i, '')
+    .replace(/^```/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  try {
+    return JSON.parse(
+      cleaned
+    ) as ScreeningResult;
+  } catch {
+    return null;
+  }
+}
+
+function readApplication(
+  raw: Record<string, unknown>
+): SellerApplication {
+  return {
+    fullName:
+      text(raw.fullName),
+
+    businessName:
+      text(
+        raw.businessName ||
+        raw.companyName ||
+        raw.company
+      ),
+
+    businessEmail:
+      text(
+        raw.businessEmail ||
+        raw.email
+      ),
+
+    phone:
+      text(
+        raw.phone ||
+        raw.phoneNumber
+      ),
+
+    country:
+      text(raw.country),
+
+    address:
+      text(
+        raw.address ||
+        raw.businessAddress ||
+        raw.streetAddress
+      ),
+
+    city:
+      text(
+        raw.city ||
+        raw.businessCity
+      ),
+
+    state:
+      text(
+        raw.state ||
+        raw.province ||
+        raw.businessState
+      ),
+
+    zipCode:
+      text(
+        raw.zipCode ||
+        raw.zip ||
+        raw.postalCode
+      ),
+
+    website:
+      text(
+        raw.website ||
+        raw.websiteUrl
+      ),
+
+    businessType:
+      text(
+        raw.businessType
+      ),
+
+    yearsInBusiness:
+      text(
+        raw.yearsInBusiness ||
+        raw.years_in_business
+      ),
+
+    productCategories:
+      text(
+        raw.productCategories ||
+        raw.categories ||
+        raw.category
+      ),
+
+    businessInformation:
+      text(
+        raw.businessInformation ||
+        raw.businessDescription ||
+        raw.description
+      ),
+
+    whyWorkWithAuronix:
+      text(
+        raw.whyWorkWithAuronix ||
+        raw.whyAuronix ||
+        raw.message ||
+        raw.comments
+      ),
+
+    catalogUrl:
+      text(
+        raw.catalogUrl ||
+        raw.catalogURL ||
+        raw.catalogLink
+      ),
+
+    contactAgreement:
+      bool(
+        raw.contactAgreement ||
+        raw.agreeToContact ||
+        raw.consent
+      ),
+  };
+}
+
+/*
+ * These are the ONLY required fields for the current
+ * seller application.
+ */
+function getMissingFields(
+  app: SellerApplication
+): string[] {
+  const missing: string[] = [];
+
+  if (!app.fullName) {
+    missing.push('fullName');
+  }
+
+  if (!app.businessName) {
+    missing.push('businessName');
+  }
+
+  if (!app.businessEmail) {
+    missing.push('businessEmail');
+  }
+
+  if (!app.phone) {
+    missing.push('phone');
+  }
+
+  if (!app.country) {
+    missing.push('country');
+  }
+
+  if (!app.address) {
+    missing.push('address');
+  }
+
+  if (!app.city) {
+    missing.push('city');
+  }
+
+  if (!app.state) {
+    missing.push('state');
+  }
+
+  if (!app.zipCode) {
+    missing.push('zipCode');
+  }
+
+  if (!app.businessType) {
+    missing.push('businessType');
+  }
+
+  if (!app.productCategories) {
+    missing.push('productCategories');
+  }
+
+  if (!app.businessInformation) {
+    missing.push('businessInformation');
+  }
+
+  if (!app.whyWorkWithAuronix) {
+    missing.push('whyWorkWithAuronix');
+  }
+
+  if (!app.contactAgreement) {
+    missing.push('contactAgreement');
+  }
+
+  return missing;
+}
+
+function calculateCompleteness(
+  app: SellerApplication
+): number {
+  const required = [
+    app.fullName,
+    app.businessName,
+    app.businessEmail,
+    app.phone,
+    app.country,
+    app.address,
+    app.city,
+    app.state,
+    app.zipCode,
+    app.businessType,
+    app.productCategories,
+    app.businessInformation,
+    app.whyWorkWithAuronix,
+    app.contactAgreement
+      ? 'yes'
+      : '',
+  ];
+
+  const completed =
+    required.filter(Boolean).length;
+
+  return Math.round(
+    (
+      completed /
+      required.length
+    ) * 100
+  );
+}
+
+function calculateQuality(
+  app: SellerApplication
+): number {
+  let score = 0;
+
+  if (
+    app.businessInformation.length >= 150
+  ) {
+    score += 20;
+  } else if (
+    app.businessInformation.length >= 80
+  ) {
+    score += 12;
+  } else if (
+    app.businessInformation.length >= 30
+  ) {
+    score += 5;
+  }
+
+  if (
+    app.whyWorkWithAuronix.length >= 120
+  ) {
+    score += 20;
+  } else if (
+    app.whyWorkWithAuronix.length >= 60
+  ) {
+    score += 12;
+  } else if (
+    app.whyWorkWithAuronix.length >= 20
+  ) {
+    score += 5;
+  }
+
+  if (
+    app.productCategories.length >= 30
+  ) {
+    score += 15;
+  } else if (
+    app.productCategories.length >= 10
+  ) {
+    score += 10;
+  } else if (
+    app.productCategories.length > 0
+  ) {
+    score += 5;
+  }
+
+  if (app.website) {
+    score += 10;
+  }
+
+  if (
+    app.catalogUrl
+  ) {
+    score += 10;
+  }
+
+  if (
+    app.yearsInBusiness
+  ) {
+    const years =
+      Number(
+        app.yearsInBusiness
+      );
+
+    if (
+      Number.isFinite(years) &&
+      years >= 0 &&
+      years <= 100
+    ) {
+      score += 10;
+    }
+  }
+
+  /*
+   * Valid contact/business structure.
+   */
+  if (
+    app.fullName &&
+    app.businessName &&
+    app.businessEmail &&
+    app.phone
+  ) {
+    score += 15;
+  }
+
+  return Math.min(
+    100,
+    score
+  );
+}
+
+async function screenOne(
+  applicationId: string
+) {
+  const applicationRef =
+    adminDb.ref(
+      `sellerApplications/${applicationId}`
+    );
+
+  const snapshot =
+    await applicationRef.get();
+
+  if (!snapshot.exists()) {
+    throw new Error(
+      'Seller application was not found.'
+    );
+  }
+
+  const raw =
+    snapshot.val() as Record<
+      string,
+      unknown
+    >;
+
+  const app =
+    readApplication(raw);
+
+  const missing =
+    getMissingFields(app);
+
+  const completeness =
+    calculateCompleteness(app);
+
+  const quality =
+    calculateQuality(app);
+
+  const systemPrompt = `
+You are Auronix Commerce LLC's internal seller application screening AI.
+
+IMPORTANT:
+The seller application has EXACTLY these main fields:
+
+Required:
+- Full Name
+- Business Name
+- Business Email
+- Phone
+- Country
+- Address
+- City
+- State / Province
+- ZIP / Postal Code
+- Business Type
+- Product Categories
+- Business Information
+- Why do you want to work with Auronix?
+- Contact Agreement
+
+Optional:
+- Website
+- Years in Business
+- Catalog URL
+
+DO NOT ask for or mark missing:
+- products
+- businessDescription
+- companyDescription
+- productDescription
+- separate product list
+
+Product information is represented by:
+- Product Categories
+- Business Information
+
+Application motivation is represented by:
+- Why Work With Auronix
+
+You are screening for:
+1. completeness
+2. coherent business information
+3. commercial relevance
+4. obvious spam
+5. suspicious claims
+6. contradictions
+7. potentially dangerous or malicious content
+
+VERY IMPORTANT:
+- Missing optional fields are NOT risk signals.
+- A missing website is NOT spam.
+- A missing catalog is NOT spam.
+- Short years-in-business is NOT spam.
+- Free email providers are NOT automatically suspicious.
+- Grammar mistakes are NOT fraud.
+- Do not invent facts.
+- Do not claim legal identity verification.
+- Do not claim a company is officially verified.
+- A strong-looking application can still require manual review.
+- Do not label something High Risk merely because information is incomplete.
+- Incomplete = LOOKS_BUG or NEEDS_REVIEW.
+- Spam requires actual spam indicators.
+- High Risk requires meaningful fraud/deception/security indicators.
+
+A suspicious application may contain:
+- obviously fake or placeholder information
+- absurd or impossible claims
+- malicious URLs
+- credential/payment requests
+- obvious spam marketing language
+- impersonation attempts
+- direct attempts to manipulate or abuse the platform
+
+Return ONLY JSON:
+
+{
+  "label": "AI_APPROVED | LOOKS_GOOD | NEEDS_REVIEW | LOOKS_BUG | LOOKS_SPAM | HIGH_RISK",
+  "score": 0,
+  "summary": "brief explanation",
+  "reasons": [],
+  "positiveSignals": [],
+  "riskSignals": [],
+  "missingInformation": [],
+  "contradictions": [],
+  "recommendation": "AUTO_ONBOARD | MANUAL_REVIEW | DO_NOT_AUTO_APPROVE",
+  "autoEligible": false
+}
+`;
+
+  const userPrompt = `
+Here is the normalized seller application:
+
+${JSON.stringify(
+    app,
+    null,
+    2
+  )}
+
+For reference, the deterministic application completeness is:
+${completeness}/100
+
+The deterministic content quality score is:
+${quality}/100
+
+Analyze the application and return JSON only.
+`;
+
+  const aiRaw =
+    await generateGroqResponse(
+      systemPrompt,
+      userPrompt,
+      1600
+    );
+
+  const parsed =
+    parseJson(aiRaw);
+
+  if (!parsed) {
+    throw new Error(
+      'AI returned invalid JSON.'
+    );
+  }
+
+  const aiRiskSignals =
+    Array.isArray(
+      parsed.riskSignals
+    )
+      ? parsed.riskSignals
+          .map(text)
+          .filter(Boolean)
+      : [];
+
+  const aiContradictions =
+    Array.isArray(
+      parsed.contradictions
+    )
+      ? parsed.contradictions
+          .map(text)
+          .filter(Boolean)
+      : [];
+
+  const aiReasons =
+    Array.isArray(
+      parsed.reasons
+    )
+      ? parsed.reasons
+          .map(text)
+          .filter(Boolean)
+      : [];
+
+  const aiPositiveSignals =
+    Array.isArray(
+      parsed.positiveSignals
+    )
+      ? parsed.positiveSignals
+          .map(text)
+          .filter(Boolean)
+      : [];
+
+  /*
+   * SECURITY / SPAM SIGNALS:
+   * These are the ONLY things allowed to cause
+   * High Risk / Spam classification.
+   */
+  const explicitRisk =
+    aiRiskSignals.some(
+      (signal) =>
+        /fraud|scam|phishing|malicious|credential|password|payment request|impersonat|stolen|fake identity/i.test(
+          signal
+        )
+    );
+
+  /*
+   * Reject impossible numeric years as a quality/risk signal.
+   */
+  const years =
+    app.yearsInBusiness
+      ? Number(
+          app.yearsInBusiness
+        )
+      : null;
+
+  const invalidYears =
+    years !== null &&
+    (
+      !Number.isFinite(
+        years
+      ) ||
+      years < 0 ||
+      years > 100
+    );
+
+  const riskSignals =
+    unique([
+      ...aiRiskSignals,
+
+      ...(invalidYears
+        ? [
+            'Years in business is outside the valid range.',
+          ]
+        : []),
+    ]);
+
+  /*
+   * Strong spam heuristic from obvious content.
+   */
+  const combinedText = [
+    app.fullName,
+    app.businessName,
+    app.productCategories,
+    app.businessInformation,
+    app.whyWorkWithAuronix,
+  ]
+    .join(' ')
+    .toLowerCase();
+
+  const obviousSpamPatterns = [
+    /send payment/i,
+    /send money/i,
+    /send your password/i,
+    /send your credentials/i,
+    /guaranteed profits/i,
+    /buy now.*buy now/i,
+    /winner.*cash/i,
+    /free money/i,
+    /100% guaranteed/i,
+  ];
+
+  const obviousSpam =
+    obviousSpamPatterns.some(
+      (pattern) =>
+        pattern.test(
+          combinedText
+        )
+    );
+
+  const contradictionCount =
+    aiContradictions.length;
+
+  const riskCount =
+    riskSignals.length;
+
+  /*
+   * Final classification.
+   *
+   * Incomplete applications:
+   * - Never High Risk merely because they're incomplete.
+   */
+  let label:
+    ScreeningLabel;
+
+  let score: number;
+
+  let recommendation:
+    Recommendation;
+
+  let autoEligible =
+    false;
+
+  if (
+    explicitRisk ||
+    obviousSpam
+  ) {
+    label =
+      riskCount >= 2 ||
+      obviousSpam
+        ? 'HIGH_RISK'
+        : 'LOOKS_SPAM';
+
+    score =
+      Math.min(
+        20,
+        Math.max(
+          0,
+          completeness -
+            60
+        )
+      );
+
+    recommendation =
+      'DO_NOT_AUTO_APPROVE';
+  } else if (
+    contradictionCount >= 3
+  ) {
+    label =
+      'NEEDS_REVIEW';
+
+    score =
+      Math.min(
+        completeness,
+        65
+      );
+
+    recommendation =
+      'MANUAL_REVIEW';
+  } else if (
+    missing.length >= 4
+  ) {
+    label =
+      'LOOKS_BUG';
+
+    score =
+      Math.min(
+        completeness,
+        60
+      );
+
+    recommendation =
+      'MANUAL_REVIEW';
+  } else {
+    /*
+     * Clean applications.
+     *
+     * Combine deterministic scores instead of blindly trusting
+     * the model's subjective "92%" score.
+     */
+    score =
+      Math.round(
+        (
+          completeness * 0.65 +
+          quality * 0.35
+        )
+      );
+
+    if (
+      completeness === 100 &&
+      quality >= 80 &&
+      riskCount === 0 &&
+      contradictionCount === 0 &&
+      app.businessInformation.length >= 100 &&
+      app.whyWorkWithAuronix.length >= 50
+    ) {
+      label =
+        'AI_APPROVED';
+
+      score = 100;
+
+      recommendation =
+        'AUTO_ONBOARD';
+
+      autoEligible =
+        true;
+    } else if (
+      score >= 80
+    ) {
+      label =
+        'LOOKS_GOOD';
+
+      recommendation =
+        'MANUAL_REVIEW';
+    } else {
+      label =
+        'NEEDS_REVIEW';
+
+      recommendation =
+        'MANUAL_REVIEW';
+    }
+  }
+
+  const missingInformation =
+    unique(missing);
+
+  const reasons =
+    unique([
+      ...aiReasons,
+
+      `Application completeness: ${completeness}%.`,
+
+      `Application content quality: ${quality}%.`,
+    ]);
+
+  if (
+    missingInformation.length > 0
+  ) {
+    reasons.push(
+      `Missing required fields: ${missingInformation.join(', ')}.`
+    );
+  }
+
+  if (
+    autoEligible
+  ) {
+    reasons.push(
+      'All required seller application fields are present.'
+    );
+
+    reasons.push(
+      'Business Information contains meaningful business detail.'
+    );
+
+    reasons.push(
+      'The applicant provided a meaningful reason for working with Auronix.'
+    );
+
+    if (
+      app.website
+    ) {
+      reasons.push(
+        'Website provided.'
+      );
+    }
+
+    if (
+      app.catalogUrl
+    ) {
+      reasons.push(
+        'Catalog URL provided.'
+      );
+    }
+  }
+
+  const positiveSignals =
+    unique([
+      ...aiPositiveSignals,
+
+      ...(app.website
+        ? ['Website provided.']
+        : []),
+
+      ...(app.catalogUrl
+        ? ['Catalog URL provided.']
+        : []),
+
+      ...(app.productCategories
+        ? [
+            'Product categories clearly provided.',
+          ]
+        : []),
+
+      ...(app.businessInformation.length >= 100
+        ? [
+            'Business information contains meaningful detail.',
+          ]
+        : []),
+
+      ...(app.whyWorkWithAuronix.length >= 50
+        ? [
+            'Applicant provided a meaningful partnership reason.',
+          ]
+        : []),
+    ]);
+
+  const summary =
+    autoEligible
+      ? 'Complete and coherent seller application with strong business information and no detected spam or risk indicators.'
+      : label === 'HIGH_RISK'
+        ? 'The application contains significant spam or security-risk indicators and should not be automatically approved.'
+        : label === 'LOOKS_SPAM'
+          ? 'The application contains strong spam-like indicators and requires review.'
+          : label === 'LOOKS_BUG'
+            ? 'The application is missing required information and should be completed or manually reviewed.'
+            : label === 'NEEDS_REVIEW'
+              ? 'The application needs manual review before approval.'
+              : 'The application appears generally complete and suitable, but manual review is recommended.';
+
+  const finalResult: ScreeningResult = {
+    label,
+
+    score,
+
+    summary,
+
+    reasons,
+
+    positiveSignals,
+
+    riskSignals,
+
+    missingInformation,
+
+    contradictions:
+      unique(
+        aiContradictions
+      ),
+
+    recommendation,
+
+    autoEligible,
+  };
+
+  const now =
+    Date.now();
+
+  await applicationRef.update({
+    normalizedApplication:
+      app,
+
+    aiScreening: {
+      ...finalResult,
+
+      screenedAt:
+        now,
+
+      version:
+        'seller-screen-v4',
+
+      model:
+        process.env.GROQ_MODEL ||
+        'configured-ai-model',
+    },
+
+    aiStatus:
+      finalResult.label,
+
+    aiScore:
+      finalResult.score,
+
+    aiAutoEligible:
+      finalResult.autoEligible,
+
+    aiLastScreenedAt:
+      now,
+
+    updatedAt:
+      now,
+  });
+
+  return {
+    applicationId,
+
+    screening:
+      finalResult,
+
+    application:
+      app,
+  };
+}
+
+export async function POST(
+  request: Request
+) {
+  try {
+    await requireAdmin(
+      request
+    );
+
+    const body =
+      await request.json();
+
+    if (
+      body.applicationId
+    ) {
+      return NextResponse.json({
+        success: true,
+
+        ...(await screenOne(
+          text(
+            body.applicationId
+          )
+        )),
+      });
+    }
+
+    if (
+      body.screenAll === true
+    ) {
+      const snapshot =
+        await adminDb
+          .ref(
+            'sellerApplications'
+          )
+          .get();
+
+      if (
+        !snapshot.exists()
+      ) {
+        return NextResponse.json({
+          success: true,
+          screened: 0,
+          results: [],
+        });
+      }
+
+      const applications =
+        snapshot.val() as Record<
+          string,
+          Record<string, unknown>
+        >;
+
+      const results: Array<
+        Record<string, unknown>
+      > = [];
+
+      for (
+        const [
+          id,
+          application,
+        ] of Object.entries(
+          applications
+        )
+      ) {
+        const status =
+          text(
+            application.status
+          ).toLowerCase();
+
+        if (
+          status === 'approved' ||
+          status === 'rejected'
+        ) {
+          continue;
+        }
+
+        const currentVersion =
+          text(
+            (
+              application
+                .aiScreening as
+                | Record<
+                    string,
+                    unknown
+                  >
+                | undefined
+            )?.version
+          );
+
+        /*
+         * Re-screen anything that does NOT have the current
+         * seller-screen-v4 result.
+         *
+         * This is important because your old records currently
+         * contain seller-screen-v2/v3 results created against
+         * the wrong schema.
+         */
+        if (
+          currentVersion ===
+          'seller-screen-v4'
+        ) {
+          continue;
+        }
+
+        try {
+          results.push(
+            await screenOne(
+              id
+            )
+          );
+        } catch (error) {
+          results.push({
+            applicationId:
+              id,
+
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Screening failed.',
+          });
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+
+        screened:
+          results.filter(
+            (result) =>
+              !result.error
+          ).length,
+
+        results,
+      });
+    }
+
+    return NextResponse.json(
+      {
+        error:
+          'Provide applicationId or screenAll=true.',
+      },
+      {
+        status: 400,
+      }
+    );
+  } catch (error) {
+    console.error(
+      'Seller AI screening failed:',
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Seller AI screening failed.',
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
