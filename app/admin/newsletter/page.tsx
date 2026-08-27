@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import {
   useEffect,
@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Send,
   Users,
+  Trash2,
 } from 'lucide-react';
 
 import {
@@ -464,6 +465,183 @@ export default function AdminNewsletterPage() {
       }
     };
 
+  const deleteCampaign = async (
+    campaignId: string,
+    subject: string
+  ) => {
+    const confirmed =
+      window.confirm(
+        'Permanently delete "' +
+        subject +
+        '"? This will also delete its linked AI campaign page and temporary URL.'
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const token =
+        await getToken();
+
+      const response =
+        await fetch(
+          '/api/admin/newsletter/delete',
+          {
+            method:
+              'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json',
+
+              ...(token
+                ? {
+                    Authorization:
+                      'Bearer ' +
+                      token,
+                  }
+                : {}),
+            },
+
+            body:
+              JSON.stringify({
+                mode:
+                  'single',
+
+                campaignId,
+              }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        data?.success !== true
+      ) {
+        throw new Error(
+          data?.error ||
+            'Unable to delete campaign.'
+        );
+      }
+
+      setCampaigns(
+        current =>
+          current.filter(
+            campaign =>
+              campaign.id !==
+              campaignId
+          )
+      );
+
+      setNotice(
+        'Campaign deleted successfully. ' +
+        String(
+          data.aiPagesDeleted || 0
+        ) +
+        ' linked AI page(s) were also deleted.'
+      );
+    } catch (
+      error
+    ) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : 'Unable to delete campaign.'
+      );
+    }
+  };
+
+  const deleteAllCampaigns =
+    async () => {
+      if (
+        campaigns.length ===
+        0
+      ) {
+        return;
+      }
+
+      const confirmed =
+        window.confirm(
+          'Permanently delete all newsletter campaigns, AI generated pages, and temporary campaign links? This cannot be undone.'
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        const token =
+          await getToken();
+
+        const response =
+          await fetch(
+            '/api/admin/newsletter/delete',
+            {
+              method:
+                'POST',
+
+              headers: {
+                'Content-Type':
+                  'application/json',
+
+                ...(token
+                  ? {
+                      Authorization:
+                        'Bearer ' +
+                        token,
+                    }
+                  : {}),
+              },
+
+              body:
+                JSON.stringify({
+                  mode:
+                    'all',
+                }),
+            }
+          );
+
+        const data =
+          await response.json();
+
+        if (
+          !response.ok ||
+          data?.success !== true
+        ) {
+          throw new Error(
+            data?.error ||
+              'Unable to clear campaign history.'
+          );
+        }
+
+        setCampaigns(
+          []
+        );
+
+        setNotice(
+          'Campaign history cleared. ' +
+          String(
+            data.campaignsDeleted || 0
+          ) +
+          ' campaign(s) and ' +
+          String(
+            data.aiPagesDeleted || 0
+          ) +
+          ' AI page(s) were deleted.'
+        );
+      } catch (
+        error
+      ) {
+        setNotice(
+          error instanceof Error
+            ? error.message
+            : 'Unable to clear campaign history.'
+        );
+      }
+    };
   const clearDraft =
     () => {
       setDraft(
@@ -834,13 +1012,38 @@ export default function AdminNewsletterPage() {
         <section className="rounded-2xl border border-border bg-card">
 
           <div className="border-b border-border p-5">
-            <h2 className="font-semibold">
-              Campaign History
-            </h2>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+              <div>
+                <h2 className="font-semibold">
+                  Campaign History
+                </h2>
+
+                <p className="mt-1 text-xs text-foreground-muted">
+                  {campaigns.length}
+                  {' '}
+                  campaign
+                  {campaigns.length === 1 ? '' : 's'}
+                </p>
+              </div>
+
+              {campaigns.length > 0 && (
+                <button
+                  type="button"
+                  onClick={deleteAllCampaigns}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-4 py-2.5 text-xs font-bold text-red-700 hover:bg-red-500/10"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete All History
+                </button>
+              )}
+
+            </div>
+
           </div>
 
-          {campaigns.length ===
-          0 ? (
+          {campaigns.length === 0 ? (
             <div className="p-8 text-center text-sm text-foreground-muted">
               No newsletter campaigns have been sent yet.
             </div>
@@ -848,29 +1051,22 @@ export default function AdminNewsletterPage() {
             <div className="divide-y divide-border">
 
               {campaigns.map(
-                (
-                  campaign
-                ) => (
+                campaign => (
                   <div
-                    key={
-                      campaign.id
-                    }
-                    className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between"
+                    key={campaign.id}
+                    className="flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between"
                   >
 
-                    <div>
+                    <div className="min-w-0">
+
                       <div className="font-medium">
-                        {
-                          campaign.subject ||
-                          'Untitled newsletter'
-                        }
+                        {campaign.subject ||
+                          'Untitled newsletter'}
                       </div>
 
                       <div className="mt-1 text-xs text-foreground-muted">
-                        {
-                          campaign.status ||
-                          'unknown'
-                        }
+                        {campaign.status ||
+                          'unknown'}
 
                         {' · '}
 
@@ -880,28 +1076,42 @@ export default function AdminNewsletterPage() {
                             ).toLocaleString()
                           : 'Unknown date'}
                       </div>
+
                     </div>
 
-                    <div className="text-xs text-foreground-muted">
-                      Sent:{' '}
-                      {
-                        campaign.sent ??
-                        0
-                      }
+                    <div className="flex flex-wrap items-center gap-3">
 
-                      {' / '}
+                      <div className="text-xs text-foreground-muted">
+                        Sent:{' '}
+                        {campaign.sent ??
+                          0}
 
-                      {
-                        campaign.totalRecipients ??
-                        0
-                      }
+                        {' / '}
 
-                      {' · Failed: '}
+                        {campaign.totalRecipients ??
+                          0}
 
-                      {
-                        campaign.failed ??
-                        0
-                      }
+                        {' · Failed: '}
+
+                        {campaign.failed ??
+                          0}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          deleteCampaign(
+                            campaign.id,
+                            campaign.subject ||
+                              'Untitled newsletter'
+                          )
+                        }
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/5 px-3 py-2 text-xs font-bold text-red-700 hover:bg-red-500/10"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Delete
+                      </button>
+
                     </div>
 
                   </div>

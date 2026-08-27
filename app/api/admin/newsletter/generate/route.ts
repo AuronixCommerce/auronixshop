@@ -1,4 +1,6 @@
-﻿import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebase-admin';
+
+import { NextResponse } from 'next/server';
 
 import {
   requireAdmin,
@@ -8,6 +10,14 @@ import {
   generateGroqResponse,
 } from '@/lib/server-groq';
 
+import {
+  createTemporaryNewsletterLink,
+} from '@/lib/temporary-newsletter-links';
+
+import {
+  normalizeCampaignPageData,
+} from '@/lib/campaign-page-schema';
+
 const WEBSITE =
   'https://auronixcommerce.com';
 
@@ -16,233 +26,30 @@ const SUPPORT_EMAIL =
 
 function clean(
   value: unknown,
-  max = 6000
-) {
+  max = 10000
+): string {
   return typeof value === 'string'
     ? value.trim().slice(0, max)
     : '';
 }
 
-function escapeHtml(
-  value: string
-) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function markdownToHtml(
-  value: string
-) {
-  let html =
-    escapeHtml(value);
-
-  html =
-    html.replace(
-      /\*\*([^*]+)\*\*/g,
-      '<strong>$1</strong>'
-    );
-
-  html =
-    html.replace(
-      /\*([^*]+)\*/g,
-      '<em>$1</em>'
-    );
-
-  html =
-    html.replace(
-      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-      '<a href="$2" style="color:#111111;font-weight:700;text-decoration:underline;">$1</a>'
-    );
-
-  html =
-    html.replace(
-      /(https?:\/\/[^\s<]+)/g,
-      '<a href="$1" style="color:#111111;font-weight:700;text-decoration:underline;">$1</a>'
-    );
-
-  return html
-    .split(/\n\s*\n/)
-    .map(
-      (paragraph) => `
-        <p style="margin:0 0 20px;color:#333333;font-size:15px;line-height:1.8;">
-          ${paragraph.replace(
-            /\n/g,
-            '<br />'
-          )}
-        </p>
-      `
-    )
-    .join('');
-}
-
-function buildNewsletterHtml({
-  title,
-  intro,
-  body,
-  ctaText,
-  ctaUrl,
-}: {
-  title: string;
-  intro: string;
-  body: string;
-  ctaText: string;
-  ctaUrl: string;
-}) {
-  const safeTitle =
-    escapeHtml(title);
-
-  const safeIntro =
-    escapeHtml(intro);
-
-  const safeCtaText =
-    escapeHtml(ctaText);
-
-  const safeCtaUrl =
-    /^https?:\/\//.test(ctaUrl)
-      ? ctaUrl
-      : WEBSITE;
-
-  return `
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="x-apple-disable-message-reformatting">
-<title>Auronix Commerce LLC</title>
-</head>
-
-<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111111;">
-
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-    ${safeIntro}
-  </div>
-
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f3f4f6;">
-    <tr>
-      <td align="center" style="padding:32px 16px;">
-
-        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:680px;background:#ffffff;border:1px solid #e5e7eb;border-radius:24px;overflow:hidden;">
-
-          <tr>
-            <td style="padding:28px 32px;border-bottom:1px solid #eeeeee;">
-
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td>
-
-                    <div style="font-size:20px;font-weight:800;letter-spacing:-0.03em;">
-                      AURONIX
-                    </div>
-
-                    <div style="margin-top:4px;font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#8b8b8b;">
-                      COMMERCE LLC
-                    </div>
-
-                  </td>
-
-                  <td align="right">
-
-                    <div style="display:inline-block;padding:7px 11px;border-radius:999px;background:#f5f5f5;color:#666666;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">
-                      UPDATE
-                    </div>
-
-                  </td>
-                </tr>
-              </table>
-
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:40px 32px 18px;">
-
-              <h1 style="margin:0;font-size:34px;line-height:1.05;letter-spacing:-0.045em;font-weight:800;">
-                ${safeTitle}
-              </h1>
-
-              <p style="margin:16px 0 0;color:#666666;font-size:15px;line-height:1.75;">
-                ${safeIntro}
-              </p>
-
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:18px 32px 36px;">
-
-              ${markdownToHtml(body)}
-
-              <div style="margin-top:28px;">
-                <a
-                  href="${safeCtaUrl}"
-                  style="display:inline-block;padding:14px 22px;border-radius:12px;background:#111111;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;"
-                >
-                  ${safeCtaText}
-                </a>
-              </div>
-
-            </td>
-          </tr>
-
-          <tr>
-            <td style="padding:26px 32px;background:#fafafa;border-top:1px solid #eeeeee;">
-
-              <div style="font-size:14px;font-weight:700;color:#111111;">
-                Regards,
-              </div>
-
-              <div style="margin-top:5px;font-size:14px;font-weight:700;color:#111111;">
-                Auronix Commerce LLC
-              </div>
-
-              <div style="margin-top:4px;font-size:13px;color:#777777;">
-                eCommerce · Procurement · Marketplace Operations
-              </div>
-
-              <div style="margin-top:14px;font-size:13px;">
-                <a href="${WEBSITE}" style="color:#111111;text-decoration:none;font-weight:600;">
-                  ${WEBSITE}
-                </a>
-              </div>
-
-              <div style="margin-top:5px;font-size:13px;">
-                <a href="mailto:${SUPPORT_EMAIL}" style="color:#111111;text-decoration:none;">
-                  ${SUPPORT_EMAIL}
-                </a>
-              </div>
-
-              <div style="margin-top:18px;font-size:11px;line-height:1.6;color:#999999;">
-                You are receiving this message from Auronix Commerce LLC.
-                Please contact us if you have questions about this communication.
-              </div>
-
-            </td>
-          </tr>
-
-        </table>
-
-      </td>
-    </tr>
-  </table>
-
-</body>
-</html>
-`.trim();
-}
-
 function extractJson(
   value: string
-) {
+): any {
   const cleaned =
     value
-      .replace(/^```json\s*/i, '')
-      .replace(/^```\s*/i, '')
-      .replace(/```\s*$/i, '')
+      .replace(
+        /^```json\s*/i,
+        ''
+      )
+      .replace(
+        /^```\s*/i,
+        ''
+      )
+      .replace(
+        /```\s*$/i,
+        ''
+      )
       .trim();
 
   try {
@@ -251,10 +58,14 @@ function extractJson(
     );
   } catch {
     const start =
-      cleaned.indexOf('{');
+      cleaned.indexOf(
+        '{'
+      );
 
     const end =
-      cleaned.lastIndexOf('}');
+      cleaned.lastIndexOf(
+        '}'
+      );
 
     if (
       start >= 0 &&
@@ -269,9 +80,164 @@ function extractJson(
     }
 
     throw new Error(
-      'AI returned invalid newsletter JSON.'
+      'AI returned invalid campaign JSON.'
     );
   }
+}
+
+function escapeHtml(
+  value: string
+): string {
+  return value
+    .replace(
+      /&/g,
+      '&amp;'
+    )
+    .replace(
+      /</g,
+      '&lt;'
+    )
+    .replace(
+      />/g,
+      '&gt;'
+    )
+    .replace(
+      /"/g,
+      '&quot;'
+    )
+    .replace(
+      /'/g,
+      '&#039;'
+    );
+}
+
+function markdownToHtml(
+  value: string
+): string {
+  let html =
+    escapeHtml(
+      value
+    );
+
+  html =
+    html.replace(
+      /\*\*([^*]+)\*\*/g,
+      '<strong>$1</strong>'
+    );
+
+  html =
+    html.replace(
+      /\*([^*]+)\*/g,
+      '<em>$1</em>'
+    );
+
+  return html
+    .split(
+      /\n\s*\n/
+    )
+    .map(
+      paragraph =>
+        '<p style="margin:0 0 18px;color:#333333;font-size:15px;line-height:1.8;">' +
+        paragraph.replace(
+          /\n/g,
+          '<br />'
+        ) +
+        '</p>'
+    )
+    .join('');
+}
+
+function buildNewsletter(
+  page: any,
+  campaignUrl: string
+) {
+  const content =
+    [
+      page.headline,
+      page.subheadline,
+      page.description,
+      ...page.blocks.map(
+        (block: any) => {
+          if (
+            typeof block?.body ===
+            'string'
+          ) {
+            return block.body;
+          }
+
+          if (
+            Array.isArray(
+              block?.items
+            )
+          ) {
+            return block.items
+              .map(
+                (item: any) =>
+                  [
+                    item?.title,
+                    item?.description,
+                  ]
+                    .filter(Boolean)
+                    .join(' — ')
+              )
+              .join('\n');
+          }
+
+          if (
+            typeof block?.message ===
+            'string'
+          ) {
+            return block.message;
+          }
+
+          return '';
+        }
+      ),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+  return (
+    '<!doctype html>' +
+    '<html><body style="margin:0;padding:0;background:#f4f5f7;font-family:Arial,Helvetica,sans-serif;">' +
+    '<table width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 14px;">' +
+    '<table width="100%" cellpadding="0" cellspacing="0" style="max-width:700px;background:#ffffff;border-radius:24px;overflow:hidden;">' +
+    '<tr><td style="padding:28px 32px;border-bottom:1px solid #eeeeee;">' +
+    '<div style="font-size:20px;font-weight:800;">AURONIX</div>' +
+    '<div style="margin-top:3px;font-size:9px;font-weight:700;letter-spacing:3px;color:#888888;">COMMERCE LLC</div>' +
+    '</td></tr>' +
+    '<tr><td style="padding:38px 32px 30px;">' +
+    '<h1 style="margin:0;font-size:34px;line-height:1.05;font-weight:800;letter-spacing:-0.04em;">' +
+    escapeHtml(page.headline) +
+    '</h1>' +
+    '<p style="margin:16px 0;color:#666666;font-size:15px;line-height:1.75;">' +
+    escapeHtml(page.subheadline) +
+    '</p>' +
+    markdownToHtml(content) +
+    '<div style="margin-top:28px;">' +
+    '<a href="' +
+    campaignUrl +
+    '" style="display:inline-block;padding:14px 22px;border-radius:12px;background:#111111;color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;">' +
+    escapeHtml(page.primaryCtaText) +
+    '</a>' +
+    '</div>' +
+    '</td></tr>' +
+    '<tr><td style="padding:28px 32px;background:#fafafa;border-top:1px solid #eeeeee;">' +
+    '<div style="font-size:14px;font-weight:700;">Regards,</div>' +
+    '<div style="margin-top:6px;font-size:14px;font-weight:700;">Auronix Commerce LLC</div>' +
+    '<div style="margin-top:4px;font-size:13px;color:#777777;">eCommerce · Procurement · Marketplace Operations</div>' +
+    '<div style="margin-top:14px;font-size:13px;"><a href="' +
+    WEBSITE +
+    '" style="color:#111111;text-decoration:none;">' +
+    WEBSITE +
+    '</a></div>' +
+    '<div style="margin-top:5px;font-size:13px;"><a href="mailto:' +
+    SUPPORT_EMAIL +
+    '" style="color:#111111;text-decoration:none;">' +
+    SUPPORT_EMAIL +
+    '</a></div>' +
+    '</td></tr></table></td></tr></table></body></html>'
+  );
 }
 
 export async function POST(
@@ -282,91 +248,229 @@ export async function POST(
       request
     );
 
-    const body =
+    const input =
       await request.json();
 
     const topic =
       clean(
-        body?.topic,
-        1200
+        input?.topic,
+        1500
       );
 
     const instructions =
       clean(
-        body?.instructions,
-        5000
+        input?.instructions,
+        7000
       );
 
-    if (!topic) {
+    if (
+      !topic
+    ) {
       return NextResponse.json(
         {
+          success:
+            false,
           error:
-            'Newsletter topic is required.',
+            'A campaign topic is required.',
         },
         {
-          status: 400,
+          status:
+            400,
         }
       );
     }
 
     const system = `
-You are the senior email marketing writer for Auronix Commerce LLC.
+You are the senior campaign strategist,
+copywriter and landing-page designer for
+Auronix Commerce LLC.
 
-Website:
-${WEBSITE}
+You are generating BOTH:
 
-Support:
-${SUPPORT_EMAIL}
+1. a newsletter
+2. a temporary campaign landing page
 
-Create a polished professional business newsletter.
+The campaign page must NOT always be a form.
 
-Brand:
-Auronix Commerce LLC
+Choose the page type that best matches the topic.
 
-Tone:
-- premium
-- confident
-- modern
-- professional
-- concise
-- trustworthy
-- human
-- business focused
+Possible page types:
 
-Never invent statistics, certifications, guarantees, partnerships, revenue, customer counts, or unsupported claims.
+product-launch
+service-launch
+announcement
+early-access
+launch-event
+webinar
+waitlist
+promotion
+supplier-opportunity
+seller-opportunity
+partnership
+company-update
+article
+resource
+download
+careers
+contact
+faq
+countdown
+registration
+general
 
-Return ONLY valid JSON with this exact structure:
+Examples:
+
+Product launch:
+Create a product-focused presentation with benefits,
+features, CTA and optional inquiry form.
+
+Announcement:
+Create an editorial announcement page.
+No form unless useful.
+
+Early access:
+Create an exclusive access page.
+Optional waitlist form.
+
+Launch event:
+Create event-focused page with date/countdown,
+details, CTA and optional RSVP form.
+
+Webinar:
+Create webinar information page with topic,
+benefits, speaker/details and optional registration.
+
+Supplier opportunity:
+Create supplier-focused opportunity page
+with benefits, process and optional application form.
+
+Seller opportunity:
+Create seller-focused page with explanation,
+requirements and optional application form.
+
+Article:
+Create a beautiful editorial article page.
+Do NOT add a form unless appropriate.
+
+Resource/download:
+Create a resource landing page and optional
+lead-capture form.
+
+Careers:
+Create an opportunity page and optional
+application/contact form.
+
+FAQ:
+Create a structured FAQ page.
+No form unless appropriate.
+
+Countdown:
+Create a countdown-focused campaign page.
+
+IMPORTANT:
+
+Forms are OPTIONAL.
+
+Only set:
+"formEnabled": true
+
+when a form genuinely improves the campaign.
+
+The backend will create the working form endpoint.
+
+The generated campaign must look like a real
+premium Auronix Commerce landing page, not a
+plain text document.
+
+Use multiple visual blocks where useful.
+
+Allowed blocks:
+
+hero
+text
+features
+steps
+stats
+quote
+faq
+cta
+image
+countdown
+notice
+
+Never invent statistics or unsupported facts.
+
+Never invent:
+revenue
+customers
+certifications
+official marketplace authorization
+official partnerships
+guarantees
+government approvals
+unverified dates
+
+If a specific date is not provided, do not invent
+one. Use generic wording instead.
+
+Return ONLY valid JSON.
+
+Schema:
 
 {
-  "subject": "...",
-  "preheader": "...",
-  "title": "...",
-  "intro": "...",
-  "body": "...",
-  "ctaText": "...",
-  "ctaUrl": "https://auronixcommerce.com/..."
+  "campaignName": "...",
+  "pageType": "...",
+  "badge": "...",
+  "eyebrow": "...",
+  "headline": "...",
+  "subheadline": "...",
+  "description": "...",
+
+  "primaryCtaText": "...",
+  "primaryCtaUrl": "/",
+
+  "secondaryCtaText": "",
+  "secondaryCtaUrl": "",
+
+  "blocks": [
+    {
+      "type": "features",
+      "title": "...",
+      "items": [
+        {
+          "title": "...",
+          "description": "..."
+        }
+      ]
+    }
+  ],
+
+  "formEnabled": false,
+  "formType": "general",
+  "formTitle": "",
+  "formDescription": "",
+  "formSubmitText": "",
+  "formFields": [],
+
+  "successTitle": "",
+  "successMessage": ""
 }
 
-body may contain multiple paragraphs separated by blank lines.
-
-Use Markdown inside body when useful:
-**bold**
-[link text](https://auronixcommerce.com/example)
-
-Do not return HTML.
+The CTA URL is only a suggested public destination.
+The backend creates the final working campaign URL.
 
 Topic:
 ${topic}
 
 Additional instructions:
-${instructions || 'Use your best professional judgment.'}
+${instructions || 'Choose the best campaign format automatically.'}
 `;
 
     const result =
       await generateGroqResponse(
         system,
-        `Create the newsletter for this topic: ${topic}`,
-        1200
+        topic,
+        2200
       );
 
     const parsed =
@@ -374,120 +478,196 @@ ${instructions || 'Use your best professional judgment.'}
         result
       );
 
-    const subject =
-      clean(
-        parsed?.subject,
-        180
-      ) ||
-      'Auronix Commerce Update';
+    const expiresAt =
+      Date.now() +
+      72 *
+        60 *
+        60 *
+        1000;
 
-    const preheader =
-      clean(
-        parsed?.preheader,
-        240
-      ) ||
-      'An update from Auronix Commerce LLC.';
-
-    const title =
-      clean(
-        parsed?.title,
-        180
-      ) ||
-      subject;
-
-    const intro =
-      clean(
-        parsed?.intro,
-        700
-      ) ||
-      preheader;
-
-    const bodyText =
-      clean(
-        parsed?.body,
-        12000
+    const pageData =
+      normalizeCampaignPageData(
+        parsed,
+        expiresAt
       );
 
-    const ctaText =
-      clean(
-        parsed?.ctaText,
-        100
-      ) ||
-      'Visit Auronix Commerce';
+    const campaignId =
+      'ai-' +
+      Date.now() +
+      '-' +
+      Math.random()
+        .toString(36)
+        .slice(
+          2,
+          8
+        );
 
-    const ctaUrl =
-      clean(
-        parsed?.ctaUrl,
-        500
-      ) ||
-      WEBSITE;
+    const temporary =
+      await createTemporaryNewsletterLink({
+        campaignId,
 
-    if (!bodyText) {
-      throw new Error(
-        'AI generated an empty newsletter body.'
-      );
-    }
+        label:
+          pageData.primaryCtaText,
 
-    const html =
-      buildNewsletterHtml({
-        title,
-        intro,
-        body:
-          bodyText,
-        ctaText,
-        ctaUrl,
+        title:
+          pageData.headline,
+
+        destinationPath:
+          pageData.primaryCtaUrl ||
+          '/',
+
+        expiresAt,
+
+        pageData,
       });
 
-    const plainText =
-      `${title}
+    await adminDb
+      .ref(
+        `aiGeneratedNewsletterPages/${temporary.token}`
+      )
+      .set({
+        token:
+          temporary.token,
 
-${intro}
+        url:
+          temporary.url,
 
-${bodyText}
+        campaignId,
 
-${ctaText}: ${ctaUrl}
+        campaignName:
+          pageData.campaignName,
 
-Regards,
-Auronix Commerce LLC
-${WEBSITE}
-${SUPPORT_EMAIL}`;
+        pageType:
+          pageData.pageType,
 
-    return NextResponse.json(
-      {
-        success: true,
+        title:
+          pageData.headline,
 
-        newsletter: {
-          subject,
-          preheader,
-          html,
-          text:
-            plainText,
+        destinationPath:
+          pageData.primaryCtaUrl ||
+          '/',
+
+        formEnabled:
+          pageData.formEnabled,
+
+        createdAt:
+          Date.now(),
+
+        expiresAt,
+
+        active:
+          true,
+
+        viewCount:
+          0,
+
+        reservationCount:
+          0,
+
+        source:
+          'ai-newsletter',
+
+        activity: {
+          created: {
+            type:
+              'page-created',
+
+            createdAt:
+              Date.now(),
+
+            campaignName:
+              pageData.campaignName,
+
+            pageType:
+              pageData.pageType,
+
+            url:
+              temporary.url,
+          },
         },
-      }
-    );
+      });
+
+    const newsletterHtml =
+      buildNewsletter(
+        pageData,
+        temporary.url
+      );
+
+    const newsletterText =
+      [
+        pageData.headline,
+        pageData.subheadline,
+        pageData.description,
+        '',
+        pageData.primaryCtaText,
+        temporary.url,
+        '',
+        'Regards,',
+        'Auronix Commerce LLC',
+        WEBSITE,
+        SUPPORT_EMAIL,
+      ].join('\n');
+
+    return NextResponse.json({
+      success:
+        true,
+
+      newsletter: {
+        subject:
+          pageData.campaignName,
+
+        preheader:
+          pageData.subheadline,
+
+        html:
+          newsletterHtml,
+
+        text:
+          newsletterText,
+      },
+
+      campaignPage: {
+        token:
+          temporary.token,
+
+        url:
+          temporary.url,
+
+        campaignId,
+
+        campaignName:
+          pageData.campaignName,
+
+        pageType:
+          pageData.pageType,
+
+        formEnabled:
+          pageData.formEnabled,
+
+        expiresAt,
+      },
+    });
   } catch (
     error
   ) {
     console.error(
-      '[Newsletter Generate]',
+      '[Newsletter Campaign Generator]',
       error
     );
 
     return NextResponse.json(
       {
+        success:
+          false,
+
         error:
           error instanceof Error
             ? error.message
-            : 'Unable to generate newsletter.',
+            : 'Unable to generate campaign.',
       },
       {
         status:
-          error instanceof Error &&
-          error.message.includes(
-            'Admin'
-          )
-            ? 403
-            : 500,
+          500,
       }
     );
   }
