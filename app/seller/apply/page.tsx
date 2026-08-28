@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   CheckCircle2,
   ChevronDown,
+  Copy,
   ExternalLink,
   Loader2,
   MessageCircle,
@@ -23,10 +24,17 @@ const BUSINESS_TYPES = [
 ];
 
 const AURONIX_WHATSAPP_NUMBER = '+1 548 578 9795';
+const AURONIX_WHATSAPP_DIGITS = '15485789795';
 
 type PreferredContact = 'business' | 'personal' | '';
 type PolicyAgreement = true | false | null;
-type VerificationStatus = 'idle' | 'pending' | 'verified' | 'expired' | 'failed';
+type VerificationStatus =
+  | 'idle'
+  | 'awaiting_whatsapp'
+  | 'pending'
+  | 'verified'
+  | 'expired'
+  | 'failed';
 
 interface FormState {
   fullName: string;
@@ -93,8 +101,9 @@ export default function SellerApplyPage() {
   const [maskedPhone, setMaskedPhone] = useState('');
   const [expiresAt, setExpiresAt] = useState(0);
   const [otp, setOtp] = useState('');
-  const [sendingOtp, setSendingOtp] = useState(false);
+  const [requestingVerification, setRequestingVerification] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [copiedNumber, setCopiedNumber] = useState(false);
 
   const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setForm(current => ({ ...current, [field]: value }));
@@ -105,17 +114,18 @@ export default function SellerApplyPage() {
       setMaskedPhone('');
       setExpiresAt(0);
       setOtp('');
+      setCopiedNumber(false);
     }
   };
 
-  const sendOtp = async () => {
+  const startVerification = async () => {
     if (!clean(form.phone)) {
       setError('Enter your WhatsApp number including the country code first.');
       return;
     }
 
     setError('');
-    setSendingOtp(true);
+    setRequestingVerification(true);
     setOtp('');
 
     try {
@@ -127,29 +137,43 @@ export default function SellerApplyPage() {
 
       const data = await response.json();
       if (!response.ok) {
-        throw new Error(data.error || 'Unable to send WhatsApp OTP.');
+        throw new Error(data.error || 'Unable to start WhatsApp verification.');
       }
 
       setVerificationId(String(data.verificationId || ''));
-      setVerificationStatus('pending');
+      setVerificationStatus('awaiting_whatsapp');
       setMaskedPhone(String(data.maskedPhone || form.phone));
       setExpiresAt(Number(data.expiresAt || 0));
-    } catch (sendError) {
+    } catch (requestError) {
       setVerificationStatus('failed');
-      setError(sendError instanceof Error ? sendError.message : 'Unable to send WhatsApp OTP.');
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to start WhatsApp verification.'
+      );
     } finally {
-      setSendingOtp(false);
+      setRequestingVerification(false);
+    }
+  };
+
+  const copyAuronixNumber = async () => {
+    try {
+      await navigator.clipboard.writeText(AURONIX_WHATSAPP_NUMBER);
+      setCopiedNumber(true);
+      window.setTimeout(() => setCopiedNumber(false), 1800);
+    } catch {
+      setError(`Copy this WhatsApp number manually: ${AURONIX_WHATSAPP_NUMBER}`);
     }
   };
 
   const verifyOtp = async () => {
     if (!verificationId) {
-      setError('Send an OTP to your WhatsApp number first.');
+      setError('Click Verify Number first.');
       return;
     }
 
     if (!/^\d{6}$/.test(otp)) {
-      setError('Enter the 6-digit OTP sent to your WhatsApp number.');
+      setError('Enter the 6-digit OTP received from Auronix Commerce on WhatsApp.');
       return;
     }
 
@@ -177,7 +201,11 @@ export default function SellerApplyPage() {
       setVerificationStatus('verified');
       setOtp('');
     } catch (verifyError) {
-      setError(verifyError instanceof Error ? verifyError.message : 'Unable to verify WhatsApp OTP.');
+      setError(
+        verifyError instanceof Error
+          ? verifyError.message
+          : 'Unable to verify WhatsApp OTP.'
+      );
     } finally {
       setVerifyingOtp(false);
     }
@@ -250,7 +278,11 @@ export default function SellerApplyPage() {
       setSubmitted(true);
       setForm(INITIAL_FORM);
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : 'Unable to submit your application.');
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : 'Unable to submit your application.'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -277,6 +309,10 @@ export default function SellerApplyPage() {
       </main>
     );
   }
+
+  const whatsappUrl = `https://wa.me/${AURONIX_WHATSAPP_DIGITS}?text=${encodeURIComponent('OTP')}`;
+  const verificationStarted =
+    verificationStatus === 'awaiting_whatsapp' || verificationStatus === 'pending';
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -308,80 +344,131 @@ export default function SellerApplyPage() {
             </div>
           </Section>
 
-          <Section eyebrow="02" title="Verify WhatsApp" description={`Auronix Commerce will send a one-time code from ${AURONIX_WHATSAPP_NUMBER} to the WhatsApp number entered above.`}>
+          <Section eyebrow="02" title="Verify WhatsApp Number" description="Verify that you control the WhatsApp number entered above before submitting your seller application.">
             {verificationStatus === 'verified' ? (
               <div className="rounded-2xl border border-green-500/30 bg-green-500/5 p-5">
                 <div className="flex items-center gap-3">
                   <CheckCircle2 className="h-6 w-6 text-green-600" />
                   <div>
-                    <div className="font-semibold text-green-700">WhatsApp Verified</div>
+                    <div className="font-semibold text-green-700">WhatsApp Number Verified</div>
                     <div className="mt-1 text-sm text-foreground-muted">{maskedPhone || form.phone} has been verified successfully.</div>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="space-y-5 rounded-2xl border border-border bg-secondary/30 p-5 sm:p-6">
-                <div className="flex items-start gap-3">
-                  <MessageCircle className="mt-0.5 h-6 w-6 text-green-600" />
-                  <div>
-                    <div className="font-semibold">WhatsApp OTP Verification</div>
-                    <p className="mt-1 text-sm leading-6 text-foreground-muted">
-                      Click Send OTP on WhatsApp. A 6-digit code will be sent to your entered number from Auronix Commerce.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={sendOtp}
-                  disabled={sendingOtp || !clean(form.phone)}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
-                >
-                  {sendingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-                  {verificationId ? 'Resend OTP on WhatsApp' : 'Send OTP on WhatsApp'}
-                </button>
-
-                {verificationId && verificationStatus === 'pending' && (
-                  <div className="rounded-2xl border border-border bg-background p-5">
-                    <label className="text-sm font-semibold">Enter 6-digit OTP</label>
-                    <p className="mt-1 text-xs leading-5 text-foreground-muted">
-                      We sent the code to {maskedPhone}. The message will come from {AURONIX_WHATSAPP_NUMBER}.
-                    </p>
-
-                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        maxLength={6}
-                        value={otp}
-                        onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="000000"
-                        className="h-12 flex-1 rounded-xl border border-border bg-background px-4 text-center text-xl font-bold tracking-[0.35em] outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={verifyOtp}
-                        disabled={verifyingOtp || otp.length !== 6}
-                        className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {verifyingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-                        Verify OTP
-                      </button>
+                {!verificationStarted && verificationStatus !== 'failed' && verificationStatus !== 'expired' && (
+                  <>
+                    <div className="flex items-start gap-3">
+                      <MessageCircle className="mt-0.5 h-6 w-6 text-green-600" />
+                      <div>
+                        <div className="font-semibold">Verify your WhatsApp number</div>
+                        <p className="mt-1 text-sm leading-6 text-foreground-muted">
+                          Click Verify Number to create a secure WhatsApp verification request for the number entered above.
+                        </p>
+                      </div>
                     </div>
 
-                    {expiresAt > 0 && (
-                      <p className="mt-3 text-xs text-foreground-muted">
-                        OTP expires at {new Date(expiresAt).toLocaleTimeString()}.
+                    <button
+                      type="button"
+                      onClick={startVerification}
+                      disabled={requestingVerification || !clean(form.phone)}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    >
+                      {requestingVerification ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                      {requestingVerification ? 'Creating Verification...' : 'Verify Number'}
+                    </button>
+                  </>
+                )}
+
+                {verificationStarted && (
+                  <>
+                    <div className="rounded-2xl border border-green-500/20 bg-green-500/5 p-5">
+                      <div className="flex items-start gap-3">
+                        <MessageCircle className="mt-0.5 h-6 w-6 shrink-0 text-green-600" />
+                        <div>
+                          <div className="font-semibold">Verification code request generated on WhatsApp</div>
+                          <p className="mt-2 text-sm leading-6 text-foreground-muted">
+                            From the same WhatsApp number you entered ({maskedPhone}), message <strong>OTP</strong> to Auronix Commerce at <strong>{AURONIX_WHATSAPP_NUMBER}</strong>. Auronix will reply on WhatsApp with your 6-digit verification code.
+                          </p>
+                          <p className="mt-2 text-sm leading-6 text-foreground-muted">
+                            You can copy the Auronix number or click Open WhatsApp below. The button opens WhatsApp with <strong>OTP</strong> already entered for you to send.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={copyAuronixNumber}
+                        className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-5 py-3 text-sm font-semibold transition hover:bg-secondary/40"
+                      >
+                        <Copy className="h-4 w-4" />
+                        {copiedNumber ? 'Number Copied' : `Copy ${AURONIX_WHATSAPP_NUMBER}`}
+                      </button>
+
+                      <a
+                        href={whatsappUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 rounded-full bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                        Open WhatsApp & Get OTP
+                      </a>
+                    </div>
+
+                    <div className="rounded-2xl border border-border bg-background p-5">
+                      <label className="text-sm font-semibold">Enter OTP from WhatsApp</label>
+                      <p className="mt-1 text-xs leading-5 text-foreground-muted">
+                        After you message OTP to {AURONIX_WHATSAPP_NUMBER}, enter the 6-digit code Auronix replies with below.
                       </p>
-                    )}
-                  </div>
+
+                      <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          maxLength={6}
+                          value={otp}
+                          onChange={event => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                          placeholder="000000"
+                          className="h-12 flex-1 rounded-xl border border-border bg-background px-4 text-center text-xl font-bold tracking-[0.35em] outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={verifyOtp}
+                          disabled={verifyingOtp || otp.length !== 6}
+                          className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          {verifyingOtp ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                          {verifyingOtp ? 'Verifying...' : 'Verify OTP'}
+                        </button>
+                      </div>
+
+                      {expiresAt > 0 && (
+                        <p className="mt-3 text-xs text-foreground-muted">
+                          Verification request expires at {new Date(expiresAt).toLocaleTimeString()}.
+                        </p>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {(verificationStatus === 'expired' || verificationStatus === 'failed') && (
-                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-700">
-                    This OTP is no longer active. Click Send OTP on WhatsApp to request a new code.
+                  <div className="space-y-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-700">
+                    <p>This verification request is no longer active. Create a new request and message OTP from the same WhatsApp number.</p>
+                    <button
+                      type="button"
+                      onClick={startVerification}
+                      disabled={requestingVerification || !clean(form.phone)}
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      {requestingVerification ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
+                      Create New Verification
+                    </button>
                   </div>
                 )}
               </div>
