@@ -30,11 +30,18 @@ export async function GET(request: Request) {
 
     const value = snapshot.val();
     const now = Date.now();
-    let status = String(value?.status || 'pending');
+    let status = String(value?.status || 'awaiting_whatsapp');
 
-    if (status === 'pending' && Number(value?.expiresAt || 0) <= now) {
+    if (
+      (status === 'awaiting_whatsapp' || status === 'pending') &&
+      Number(value?.expiresAt || 0) <= now
+    ) {
       status = 'expired';
-      await ref.update({ status: 'expired', updatedAt: now, codeHash: null });
+      await ref.update({
+        status: 'expired',
+        codeHash: null,
+        updatedAt: now,
+      });
     }
 
     return NextResponse.json({
@@ -42,9 +49,14 @@ export async function GET(request: Request) {
       verificationId,
       status,
       verified: status === 'verified',
+      awaitingWhatsapp: status === 'awaiting_whatsapp',
+      otpIssued: Boolean(value?.otpSentAt),
       maskedPhone: maskPhone(String(value?.phone || '')),
       expiresAt: Number(value?.expiresAt || 0),
       attempts: Number(value?.attempts || 0),
+      otpRequestedAt: Number(value?.otpRequestedAt || 0) || null,
+      otpSentAt: Number(value?.otpSentAt || 0) || null,
+      verifiedAt: Number(value?.verifiedAt || 0) || null,
     });
   } catch (error) {
     return NextResponse.json(
