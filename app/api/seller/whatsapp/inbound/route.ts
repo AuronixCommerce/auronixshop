@@ -1,11 +1,12 @@
+import { randomInt } from 'crypto';
 import { NextResponse } from 'next/server';
 
 import { adminDb } from '@/lib/firebase-admin';
 import {
+  hashOtp,
   normalizePhone,
-  OTP_MAX_ATTEMPTS,
+  OTP_TTL_MS,
   safeKey,
-  verifyOtpHash,
 } from '@/lib/seller-whatsapp';
 
 export const runtime = 'nodejs';
@@ -25,9 +26,8 @@ export async function POST(request: Request) {
     const senderPhone = normalizePhone(body?.from);
     const messageId = String(body?.messageId || '').trim();
     const messageBody = String(body?.body || '').trim();
-    const match = /^VERIFY\s+AURONIX\s+(\d{6})$/i.exec(messageBody);
 
-    if (!messageId || !match) {
+    if (!messageId || !/^OTP$/i.test(messageBody)) {
       return NextResponse.json({ success: true, handled: false, reply: null });
     }
 
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         handled: true,
-        reply: 'Auronix Commerce could not find an active verification request for this WhatsApp number. Please return to the seller application and request a new code.',
+        reply: 'No active Auronix seller verification was found for this WhatsApp number. Return to the seller application, enter this same number, and click Verify Number first.',
       });
     }
 
@@ -61,7 +61,6 @@ export async function POST(request: Request) {
       .sort((a, b) => Number(b[1]) - Number(a[1]))
       .map(([id]) => id);
 
-    const code = match[1];
     const now = Date.now();
 
     for (const verificationId of ids) {
@@ -81,73 +80,53 @@ export async function POST(request: Request) {
         });
       }
 
-      if (status !== 'pending') continue;
+      if (status !== 'awaiting_whatsapp' && status !== 'pending') continue;
 
       if (Number(value?.expiresAt || 0) <= now) {
         await verificationRef.update({ status: 'expired', codeHash: null, updatedAt: now });
         continue;
       }
 
-      const attempts = Number(value?.attempts || 0);
-      if (attempts >= OTP_MAX_ATTEMPTS) {
-        await verificationRef.update({ status: 'failed', codeHash: null, updatedAt: now });
-        continue;
-      }
-
-      const valid = verifyOtpHash(
-        verificationId,
-        senderPhone,
-        code,
-        String(value?.codeHash || '')
-      );
-
-      if (!valid) {
-        const nextAttempts = attempts + 1;
-        await verificationRef.update({
-          attempts: nextAttempts,
-          status: nextAttempts >= OTP_MAX_ATTEMPTS ? 'failed' : 'pending',
-          codeHash: nextAttempts >= OTP_MAX_ATTEMPTS ? null : value.codeHash,
-          lastMessageId: messageId,
-          updatedAt: now,
-        });
-
-        return NextResponse.json({
-          success: true,
-          handled: true,
-          verified: false,
-          reply: nextAttempts >= OTP_MAX_ATTEMPTS
-            ? 'Auronix Commerce could not verify that code. The verification request has been locked. Please return to the seller application and request a new code.'
-            : 'Auronix Commerce could not verify that code. Please check the code shown on the seller application and try again.',
-        });
-      }
+      const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+      const otpExpiresAt = now + OTP_TTL_MS;
 
       await verificationRef.update({
-        status: 'verified',
-        verifiedAt: now,
-        messageId,
-        codeHash: null,
+        codeHash: hashOtp(verificationId, senderPhone, code),
+        status: 'pending',
+        attempts: 0,
+        otpRequestedAt: now,
+        otpSentAt: now,
+        expiresAt: otpExpiresAt,
+        lastMessageId: messageId,
         updatedAt: now,
       });
 
       return NextResponse.json({
         success: true,
         handled: true,
-        verified: true,
         verificationId,
-        reply: 'Auronix Commerce verification successful. Your WhatsApp number has been verified. You may now return to the seller application and submit it.',
+        otpIssued: true,
+        reply: [
+          'Auronix Commerce seller verification',
+          '',
+          `Your one-time verification code is: ${code}`,
+          '',
+          'Enter this 6-digit code on the Auronix seller application.',
+          'This code expires in 10 minutes.',
+          'Do not share this code with anyone.',
+        ].join('\n'),
       });
     }
 
     return NextResponse.json({
       success: true,
       handled: true,
-      verified: false,
-      reply: 'This Auronix Commerce verification code has expired or is no longer active. Please return to the seller application and request a new code.',
+      reply: 'Your Auronix seller verification request has expired. Return to the seller application and click Verify Number again.',
     });
   } catch (error) {
-    console.error('Seller WhatsApp inbound verification failed:', error);
+    console.error('Seller WhatsApp inbound OTP request failed:', error);
     return NextResponse.json(
-      { success: false, error: 'Unable to process WhatsApp verification.' },
+      { success: false, error: 'Unable to process WhatsApp OTP request.' },
       { status: 500 }
     );
   }
