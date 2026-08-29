@@ -2,9 +2,10 @@ import nodemailer from 'nodemailer';
 
 export type EmailType = string;
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'https://auronixcommerce.com').replace(/\/+$/, '');
-export const NOTIFICATION_EMAIL = process.env.MAIL_NOTIFICATION_FROM || 'notifications@auronixcommerce.com';
-export const BUSINESS_EMAIL = process.env.MAIL_BUSINESS_FROM || 'business@auronixcommerce.com';
-export const SUPPORT_EMAIL = process.env.MAIL_REPLY_TO || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || BUSINESS_EMAIL;
+export const BUSINESS_EMAIL = process.env.MAIL_FROM || process.env.SMTP_USER || 'business@auronixcommerce.com';
+export const NOTIFICATION_EMAIL = process.env.MAIL_FROM || BUSINESS_EMAIL;
+export const SUPPORT_EMAIL = process.env.MAIL_SUPPORT_EMAIL || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || BUSINESS_EMAIL;
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || 'Auronix Commerce LLC';
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.hostinger.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_SECURE = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : SMTP_PORT === 465;
@@ -30,7 +31,7 @@ async function sendWithSender(sender: string, options: MailOptions) {
   if (!options.to || (Array.isArray(options.to) && !options.to.length)) throw new Error('Email recipient is required.');
   if (!SMTP_PASSWORD) throw new Error('Email service is not configured. Set SMTP_PASSWORD.');
   const transporter = nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_SECURE, auth: { user: SMTP_USER, pass: SMTP_PASSWORD } });
-  return transporter.sendMail({ from: { name: options.fromName || 'Auronix Commerce LLC', address: sender }, to: options.to, subject: options.subject, html: options.html, text: options.text, replyTo: options.replyTo || SUPPORT_EMAIL });
+  return transporter.sendMail({ from: { name: options.fromName || MAIL_FROM_NAME, address: sender }, to: options.to, subject: options.subject, html: options.html, text: options.text, replyTo: options.replyTo || SUPPORT_EMAIL });
 }
 
 export const sendNotificationMail = (options: MailOptions) => sendWithSender(NOTIFICATION_EMAIL, options);

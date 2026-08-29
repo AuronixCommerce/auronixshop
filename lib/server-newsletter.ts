@@ -22,7 +22,7 @@ const SMTP_PASSWORD =
   '';
 
 const SUPPORT_EMAIL =
-  process.env.MAIL_REPLY_TO || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || process.env.SUPPORT_EMAIL ||
+  process.env.MAIL_SUPPORT_EMAIL || process.env.NEXT_PUBLIC_SUPPORT_EMAIL ||
   SMTP_USER ||
   '';
 
@@ -472,7 +472,7 @@ export async function sendNewsletterEmail(
 
   await transport.sendMail({
     from:
-      `"Auronix Commerce LLC" <${process.env.MAIL_NOTIFICATION_FROM || 'notifications@auronixcommerce.com'}>`,
+      `"${process.env.MAIL_FROM_NAME || 'Auronix Commerce LLC'}" <${process.env.MAIL_FROM || SMTP_USER}>`,
 
     to:
       subscriber.email,
