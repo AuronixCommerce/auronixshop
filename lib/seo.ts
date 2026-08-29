@@ -10,6 +10,9 @@ export const SEO_SITE_NAME =
 export const SEO_SOCIAL_IMAGE =
   'https://pub-6d8ed6ce9591489c885eda64cf2ea10f.r2.dev/AuronixCommerceLLC/auronix%20banner.png';
 
+export const SEO_LOGO_IMAGE =
+  'https://pub-6d8ed6ce9591489c885eda64cf2ea10f.r2.dev/AuronixCommerceLLC/AuronixNewLogo.jpeg';
+
 export const DEFAULT_KEYWORDS = [
   'Auronix Commerce LLC',
   'eCommerce',
@@ -67,6 +70,12 @@ export function buildSeo({
       new URL(
         SEO_SITE_URL
       ),
+
+    icons: {
+      icon: [{ url: SEO_LOGO_IMAGE, type: 'image/jpeg' }],
+      shortcut: [{ url: SEO_LOGO_IMAGE, type: 'image/jpeg' }],
+      apple: [{ url: SEO_LOGO_IMAGE, type: 'image/jpeg' }],
+    },
 
     alternates: {
       canonical: path,

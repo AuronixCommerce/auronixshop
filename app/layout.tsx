@@ -37,7 +37,7 @@ import {
   getMaintenanceContext,
 } from '@/lib/server-maintenance-context';
 import { ThemeProvider } from '@/components/site/theme-provider';
-import { DEFAULT_KEYWORDS, SEO_SITE_NAME, SEO_SITE_URL, SEO_SOCIAL_IMAGE } from '@/lib/seo';
+import { DEFAULT_KEYWORDS, SEO_LOGO_IMAGE, SEO_SITE_NAME, SEO_SITE_URL, SEO_SOCIAL_IMAGE } from '@/lib/seo';
 
 const inter =
   Inter({
@@ -107,12 +107,18 @@ export const metadata: Metadata = {
   creator: SEO_SITE_NAME,
   publisher: SEO_SITE_NAME,
   category: 'eCommerce',
+
+  icons: {
+    icon: [{ url: SEO_LOGO_IMAGE, type: 'image/jpeg' }],
+    shortcut: [{ url: SEO_LOGO_IMAGE, type: 'image/jpeg' }],
+    apple: [{ url: SEO_LOGO_IMAGE, type: 'image/jpeg' }],
+  },
 };
 
 const organizationSchema = {
   '@context': 'https://schema.org',
   '@graph': [
-    { '@type': 'Organization', '@id': `${SEO_SITE_URL}/#organization`, name: SEO_SITE_NAME, url: SEO_SITE_URL, image: SEO_SOCIAL_IMAGE, email: 'business@auronixcommerce.com', description: 'Auronix Commerce LLC provides product sourcing, procurement, supplier partnerships, distribution, and marketplace operations.' },
+    { '@type': 'Organization', '@id': `${SEO_SITE_URL}/#organization`, name: SEO_SITE_NAME, url: SEO_SITE_URL, logo: { '@type': 'ImageObject', url: SEO_LOGO_IMAGE }, image: SEO_SOCIAL_IMAGE, email: 'business@auronixcommerce.com', description: 'Auronix Commerce LLC provides product sourcing, procurement, supplier partnerships, distribution, and marketplace operations.' },
     { '@type': 'WebSite', '@id': `${SEO_SITE_URL}/#website`, url: SEO_SITE_URL, name: SEO_SITE_NAME, publisher: { '@id': `${SEO_SITE_URL}/#organization` }, inLanguage: 'en-US' },
   ],
 };
