@@ -2,6 +2,7 @@
 
 import {
   FormEvent,
+  useEffect,
   useState,
 } from 'react';
 
@@ -12,10 +13,44 @@ import {
   CheckCircle2,
   Loader2,
   Mail,
+  Facebook,
+  Instagram,
+  Linkedin,
+  MessageCircle,
+  Twitter,
   Send,
 } from 'lucide-react';
+import { onValue, ref } from 'firebase/database';
+import { db } from '@/lib/firebase';
+
+type PublicCompanySettings = {
+  companyName?: string;
+  footerDescription?: string;
+  whatsapp?: string;
+  linkedin?: string;
+  instagram?: string;
+  facebook?: string;
+  x?: string;
+};
+
+function socialUrl(platform: 'whatsapp' | 'linkedin' | 'instagram' | 'facebook' | 'x', raw?: string) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) {
+    try { const url = new URL(value); return ['http:', 'https:'].includes(url.protocol) ? url.toString() : ''; } catch { return ''; }
+  }
+  if (platform === 'whatsapp') {
+    const digits = value.replace(/\D/g, '');
+    return /^\d{8,15}$/.test(digits) ? `https://wa.me/${digits}` : '';
+  }
+  const handle = value.replace(/^@/, '').replace(/^\/+|\/+$/g, '');
+  if (!handle || /[\s<>]/.test(handle)) return '';
+  const bases = { linkedin: 'https://www.linkedin.com/', instagram: 'https://www.instagram.com/', facebook: 'https://www.facebook.com/', x: 'https://x.com/' };
+  return `${bases[platform]}${handle}`;
+}
 
 export function Footer() {
+  const [company, setCompany] = useState<PublicCompanySettings>({});
   const [
     email,
     setEmail,
@@ -27,6 +62,19 @@ export function Footer() {
     setLoading,
   ] =
     useState(false);
+
+  useEffect(() => {
+    if (!db) return;
+    return onValue(ref(db, 'site/settings/company'), snapshot => setCompany(snapshot.val() || {}), () => setCompany({}));
+  }, []);
+
+  const socials = [
+    { key: 'whatsapp' as const, label: 'WhatsApp', icon: MessageCircle, value: company.whatsapp },
+    { key: 'linkedin' as const, label: 'LinkedIn', icon: Linkedin, value: company.linkedin },
+    { key: 'instagram' as const, label: 'Instagram', icon: Instagram, value: company.instagram },
+    { key: 'facebook' as const, label: 'Facebook', icon: Facebook, value: company.facebook },
+    { key: 'x' as const, label: 'X', icon: Twitter, value: company.x },
+  ].map(item => ({ ...item, href: socialUrl(item.key, item.value) })).filter(item => item.href);
 
   const [
     message,
@@ -186,14 +234,19 @@ export function Footer() {
               <AuronixMark />
 
               <span className="font-semibold tracking-tight">
-                Auronix Commerce LLC
+                {company.companyName || 'Auronix Commerce LLC'}
               </span>
             </Link>
 
             <p className="mt-4 max-w-sm text-sm leading-6 text-foreground-muted">
-              Trusted eCommerce sourcing, supplier
-              partnerships, and marketplace solutions.
+              {company.footerDescription || 'Trusted eCommerce sourcing, supplier partnerships, and marketplace solutions.'}
             </p>
+
+            {socials.length > 0 && (
+              <div className="mt-5 flex flex-wrap gap-2" aria-label="Auronix Commerce social profiles">
+                {socials.map(item => { const Icon = item.icon; return <a key={item.key} href={item.href} target="_blank" rel="noopener noreferrer" aria-label={`Auronix Commerce on ${item.label}`} title={item.label} className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card text-foreground-muted transition hover:-translate-y-0.5 hover:border-accent/35 hover:bg-accent/10 hover:text-accent"><Icon className="h-4 w-4" /></a>; })}
+              </div>
+            )}
           </div>
 
           {/* COMPANY */}
@@ -236,6 +289,20 @@ export function Footer() {
                 className="block hover:text-foreground"
               >
                 Careers
+              </Link>
+
+              <Link
+                href="/blog"
+                className="block hover:text-foreground"
+              >
+                Blog & Insights
+              </Link>
+
+              <Link
+                href="/faq"
+                className="block hover:text-foreground"
+              >
+                Frequently Asked Questions
               </Link>
             </nav>
           </div>

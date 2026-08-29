@@ -84,11 +84,11 @@ export async function generateGroqResponse(
 
           /*
            * GPT-OSS supports low/medium/high
-           * reasoning on Groq. Low keeps the
-           * public site assistant responsive.
+           * reasoning on Groq. High prioritizes
+           * answer quality for the public assistant.
            */
           reasoning_effort:
-            'low',
+            'high',
 
           /*
            * Keep reasoning hidden from visitors.

@@ -406,6 +406,12 @@ export function AIChat() {
 
   const [loading, setLoading] = useState(false);
 
+  const [thinkingSeconds, setThinkingSeconds] =
+    useState(0);
+
+  const [completedThinkingSeconds, setCompletedThinkingSeconds] =
+    useState(0);
+
   const [visibleAnswer, setVisibleAnswer] =
     useState('');
 
@@ -426,6 +432,8 @@ export function AIChat() {
     );
 
   const currentAnswerRef = useRef('');
+
+  const thinkingStartedAtRef = useRef(0);
 
   const pathname =
     typeof window !== 'undefined'
@@ -450,6 +458,23 @@ export function AIChat() {
     return () =>
       window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!loading || visibleAnswer) {
+      return;
+    }
+
+    const startedAt = Date.now();
+    setThinkingSeconds(0);
+
+    const timer = window.setInterval(() => {
+      setThinkingSeconds(
+        Math.max(1, Math.floor((Date.now() - startedAt) / 1000))
+      );
+    }, 250);
+
+    return () => window.clearInterval(timer);
+  }, [loading, visibleAnswer]);
 
   useEffect(() => {
     const node = scrollRef.current;
@@ -510,6 +535,8 @@ export function AIChat() {
     currentAnswerRef.current = '';
 
     setVisibleAnswer('');
+
+    setThinkingSeconds(0);
 
     setLoading(false);
   };
@@ -612,6 +639,12 @@ export function AIChat() {
 
     setLoading(true);
 
+    setThinkingSeconds(0);
+
+    setCompletedThinkingSeconds(0);
+
+    thinkingStartedAtRef.current = Date.now();
+
     setVisibleAnswer('');
 
     currentAnswerRef.current = '';
@@ -687,6 +720,15 @@ export function AIChat() {
           'The AI returned an empty response.'
         );
       }
+
+      setCompletedThinkingSeconds(
+        Math.max(
+          1,
+          Math.round(
+            (Date.now() - thinkingStartedAtRef.current) / 1000
+          )
+        )
+      );
 
       typeAnswer(answer);
     } catch (caught) {
@@ -933,6 +975,11 @@ export function AIChat() {
                   visibleAnswer && (
                     <div className="flex justify-start">
                       <div className="max-w-[96%] rounded-2xl rounded-bl-md border border-border bg-card px-4 py-3 font-sans text-sm leading-6 text-foreground">
+                        <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-foreground-muted">
+                          <Sparkles className="h-3 w-3 text-accent" />
+                          Thought for {completedThinkingSeconds || 1} {completedThinkingSeconds === 1 ? 'second' : 'seconds'}
+                        </div>
+
                         <div className="font-sans">
                           {renderMarkdown(
                             visibleAnswer,
@@ -965,7 +1012,7 @@ export function AIChat() {
                       <div className="rounded-2xl border border-border bg-card px-4 py-3">
                         <div className="flex items-center gap-2 font-sans text-sm text-foreground-muted">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          Thinking…
+                          Thinking… {thinkingSeconds}s
                         </div>
                       </div>
                     </div>
