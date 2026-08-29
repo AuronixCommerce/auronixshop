@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import {
+  ArrowRight,
   Bot,
   ExternalLink,
   Loader2,
@@ -47,8 +48,16 @@ function makeId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+function normalizeMarkdownLinks(text: string) {
+  return text
+    .replace(/\\([()])/g, '$1')
+    .replace(/\]\s+\(/g, '](')
+    .replace(/\]\(\s+/g, '](')
+    .replace(/\s+\)/g, ')');
+}
+
 function sanitizePartialMarkdown(text: string) {
-  let value = text;
+  let value = normalizeMarkdownLinks(text);
 
   const boldMarkers = value.match(/\*\*/g) || [];
 
@@ -84,7 +93,7 @@ function renderInline(text: string) {
   const nodes: React.ReactNode[] = [];
 
   const regex =
-    /(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|\[[^\]]+\]\(https?:\/\/[^)\s]+\)|https?:\/\/[^\s<]+|`[^`]+`)/g;
+    /(\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|\[[^\]]+\]\((?:\/(?!\/)[^)\s]*|https?:\/\/[^)\s]+)\)|https?:\/\/[^\s<]+|`[^`]+`)/g;
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -110,7 +119,7 @@ function renderInline(text: string) {
           key={`bold-${key++}`}
           className="font-bold text-foreground"
         >
-          {token.slice(2, -2)}
+          {renderInline(token.slice(2, -2))}
         </strong>
       );
     } else if (
@@ -123,7 +132,7 @@ function renderInline(text: string) {
           key={`italic-${key++}`}
           className="italic"
         >
-          {token.slice(1, -1)}
+          {renderInline(token.slice(1, -1))}
         </em>
       );
     } else if (
@@ -140,23 +149,24 @@ function renderInline(text: string) {
       );
     } else if (token.startsWith('[')) {
       const link = token.match(
-        /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/
+        /^\[([^\]]+)\]\((\/(?!\/)[^)\s]*|https?:\/\/[^)\s]+)\)$/
       );
 
       if (link) {
+        const external = /^https?:\/\//.test(link[2]);
         nodes.push(
           <a
             key={`link-${key++}`}
             href={link[2]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex max-w-full items-center gap-1 break-all font-semibold text-accent underline decoration-accent/40 underline-offset-2 transition-colors hover:decoration-accent"
+            target={external ? '_blank' : undefined}
+            rel={external ? 'noopener noreferrer' : undefined}
+            className="my-1 inline-flex max-w-full items-center gap-1.5 rounded-xl border border-accent/25 bg-accent/10 px-3 py-1.5 font-semibold text-accent no-underline transition hover:-translate-y-0.5 hover:border-accent/45 hover:bg-accent/15"
           >
             <span className="break-all">
               {link[1]}
             </span>
 
-            <ExternalLink className="h-3 w-3 shrink-0" />
+            {external ? <ExternalLink className="h-3 w-3 shrink-0" /> : <ArrowRight className="h-3 w-3 shrink-0" />}
           </a>
         );
       } else {
@@ -216,7 +226,7 @@ function renderMarkdown(
 ) {
   const text = typing
     ? sanitizePartialMarkdown(raw)
-    : raw;
+    : normalizeMarkdownLinks(raw);
 
   const lines = text
     .replace(/\r\n/g, '\n')
