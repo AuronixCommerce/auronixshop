@@ -18,8 +18,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { pushData, getTimestamp } from '@/lib/firebase-db';
-import type { SupplierSubmission } from '@/lib/types';
 import { DISTRIBUTION_MODELS } from '@/lib/constants';
 import { CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
 import Link from 'next/link';
@@ -63,8 +61,7 @@ export default function BecomeSupplierPage() {
 
     setSubmitting(true);
     try {
-      const now = getTimestamp();
-      const submission: SupplierSubmission = {
+      const submission = {
         companyName: form.companyName.trim(),
         contactName: form.contactName.trim(),
         email: form.email.trim(),
@@ -76,12 +73,11 @@ export default function BecomeSupplierPage() {
         distributionModel: form.distributionModel || undefined,
         catalogUrl: form.catalogUrl.trim() || undefined,
         message: form.message.trim() || undefined,
-        status: 'new',
-        createdAt: now,
-        updatedAt: now,
+        consent: form.consent,
       };
-
-      await pushData('suppliers', submission as unknown as Record<string, unknown>);
+      const response = await fetch('/api/supplier/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submission) });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Unable to submit supplier information.');
       setSuccess(true);
       toast({ title: 'Submission received', description: 'We will be in touch soon.' });
     } catch (err) {

@@ -58,7 +58,7 @@ const PUBLIC_ROUTES: Array<{
     priority: 0.8,
   },
   {
-    path: '/become-a-supplier',
+    path: '/supplier',
     changeFrequency: 'monthly',
     priority: 0.9,
   },

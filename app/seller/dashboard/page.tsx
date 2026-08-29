@@ -2,36 +2,35 @@
 
 import { useEffect, useState } from 'react';
 import { SellerLayout } from '@/components/seller/seller-layout';
-import { auth } from '@/lib/firebase';
-import { getData } from '@/lib/firebase-db';
 import { onAuthChange } from '@/lib/auth';
 import type { UserProfile, SellerApplication } from '@/lib/types';
-import { LoadingState, EmptyState } from '@/components/site/states';
-import { Package, FileText, MessageSquare, LifeBuoy, TrendingUp } from 'lucide-react';
+import { LoadingState } from '@/components/site/states';
+import { Package, FileText, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SellerDashboardPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [application, setApplication] = useState<SellerApplication | null>(null);
   const [loading, setLoading] = useState(true);
+  const [counts, setCounts] = useState({ products: 0, catalogs: 0, tickets: 0 });
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const unsub = onAuthChange(async (user) => {
       if (!user) { setLoading(false); return; }
       try {
-        const p = await getData<UserProfile>(`users/${user.uid}`);
-        setProfile(p);
-        if (p?.sellerApplicationId) {
-          const app = await getData<SellerApplication>(`sellerApplications/${p.sellerApplicationId}`);
-          setApplication(app);
-        }
-      } catch {}
+        const { sellerWorkspaceRequest } = await import('@/lib/seller-workspace-client');
+        const data = await sellerWorkspaceRequest();
+        setProfile(data.profile); setApplication(data.application);
+        setCounts({ products: data.products.length, catalogs: data.catalogs.length, tickets: data.tickets.length });
+      } catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'Unable to load the dashboard.'); }
       setLoading(false);
     });
     return () => unsub();
   }, []);
 
   if (loading) return <SellerLayout><LoadingState /></SellerLayout>;
+  if (error) return <SellerLayout><div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 text-sm text-red-700 dark:text-red-300">{error}</div></SellerLayout>;
 
   return (
     <SellerLayout>
@@ -54,10 +53,9 @@ export default function SellerDashboardPage() {
       {/* Quick stats */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
-          { icon: Package, label: 'Products', value: '—', href: '/seller/dashboard/products' },
-          { icon: FileText, label: 'Catalogs', value: '—', href: '/seller/dashboard/catalogs' },
-          { icon: MessageSquare, label: 'Messages', value: '—', href: '/seller/dashboard/messages' },
-          { icon: LifeBuoy, label: 'Support', value: '—', href: '/seller/support' },
+          { icon: Package, label: 'Products', value: String(counts.products), href: '/seller/dashboard/products' },
+          { icon: FileText, label: 'Catalogs', value: String(counts.catalogs), href: '/seller/dashboard/catalogs' },
+          { icon: LifeBuoy, label: 'Support Tickets', value: String(counts.tickets), href: '/seller/support' },
         ].map((stat) => {
           const Icon = stat.icon;
           return (

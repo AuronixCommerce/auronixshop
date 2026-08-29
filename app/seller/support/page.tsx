@@ -3,12 +3,6 @@
 import { useEffect, useState } from 'react';
 import { SellerLayout } from '@/components/seller/seller-layout';
 import { auth } from '@/lib/firebase';
-import {
-  getData,
-  pushData,
-  subscribeToList,
-  getTimestamp,
-} from '@/lib/firebase-db';
 import { onAuthChange } from '@/lib/auth';
 import type { UserProfile, SupportTicket } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -27,6 +21,7 @@ import { LoadingState, EmptyState, ErrorState } from '@/components/site/states';
 import { TICKET_CATEGORIES } from '@/lib/constants';
 import { Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { sellerWorkspaceRequest } from '@/lib/seller-workspace-client';
 
 type SellerTicket = SupportTicket & {
   id: string;
@@ -49,8 +44,6 @@ export default function SellerSupportPage() {
   });
 
   useEffect(() => {
-    let unsubscribeTickets: (() => void) | undefined;
-
     const unsubscribeAuth = onAuthChange(async (firebaseUser) => {
       setLoading(true);
       setLoadError(null);
@@ -63,9 +56,8 @@ export default function SellerSupportPage() {
           return;
         }
 
-        const userProfile = await getData<UserProfile>(
-          `users/${firebaseUser.uid}`
-        );
+        const workspace = await sellerWorkspaceRequest();
+        const userProfile = workspace.profile as UserProfile;
 
         if (!userProfile) {
           setProfile(null);
@@ -76,20 +68,7 @@ export default function SellerSupportPage() {
 
         setProfile(userProfile);
 
-        unsubscribeTickets = subscribeToList<SupportTicket>(
-          'tickets',
-          (data) => {
-            const mine: SellerTicket[] = data
-              .filter((ticket) => ticket.sellerUid === firebaseUser.uid)
-              .map((ticket) => ({
-                ...ticket,
-                sellerUid: ticket.sellerUid as string,
-                id: ticket.id,
-              }));
-
-            setTickets(mine);
-          }
-        );
+        setTickets(workspace.tickets as SellerTicket[]);
       } catch (error) {
         console.error('Failed to load seller support:', error);
 
@@ -104,9 +83,6 @@ export default function SellerSupportPage() {
     return () => {
       unsubscribeAuth();
 
-      if (unsubscribeTickets) {
-        unsubscribeTickets();
-      }
     };
   }, []);
 
@@ -135,22 +111,8 @@ export default function SellerSupportPage() {
     setSubmitting(true);
 
     try {
-      const now = getTimestamp();
-
-      const ticket = {
-        name: profile?.name || profile?.email || '',
-        email: profile?.email || currentUser.email || '',
-        sellerUid: currentUser.uid,
-        sellerEmail: currentUser.email || profile?.email || '',
-        category,
-        subject,
-        message,
-        status: 'open',
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      await pushData('tickets', ticket);
+      const data = await sellerWorkspaceRequest('', { method: 'POST', body: JSON.stringify({ resource: 'ticket', category, subject, message }) });
+      setTickets((current) => [data.item, ...current]);
 
       toast({
         title: 'Ticket created',

@@ -22,7 +22,7 @@ export const FOOTER_NAV = {
     { label: 'Support', href: '/support' },
   ],
   Partner: [
-    { label: 'Become a Supplier', href: '/become-a-supplier' },
+    { label: 'Become a Supplier', href: '/supplier' },
     { label: 'Partner Portal', href: '/partner-portal' },
   ],
   Legal: [

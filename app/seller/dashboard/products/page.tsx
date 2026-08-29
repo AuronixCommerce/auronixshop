@@ -1,8 +1,8 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, onValue, push, set, remove } from 'firebase/database';
-import { db, auth } from '@/lib/firebase';
+import { onAuthChange } from '@/lib/auth';
+import { sellerWorkspaceRequest } from '@/lib/seller-workspace-client';
 import { SellerLayout } from '@/components/seller/seller-layout';
 import { Loader2, Plus, Trash2, Package, X } from 'lucide-react';
 
@@ -21,6 +21,8 @@ export default function SellerProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const [form, setForm] = useState({
     name: '',
@@ -31,54 +33,22 @@ export default function SellerProductsPage() {
   });
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-
-    if (!uid || !db) {
-      setLoading(false);
-      return;
-    }
-
-    return onValue(
-      ref(db, `sellerData/${uid}/products`),
-      (snapshot) => {
-        const value = snapshot.val() || {};
-
-        setProducts(
-          Object.entries(value).map(([id, item]) => ({
-            id,
-            ...(item as Product),
-          }))
-        );
-
-        setLoading(false);
-      }
-    );
+    return onAuthChange(async (user) => {
+      if (!user) { setLoading(false); return; }
+      try { const data = await sellerWorkspaceRequest(); setProducts(data.products); }
+      catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'Unable to load products.'); }
+      finally { setLoading(false); }
+    });
   }, []);
 
   const createProduct = async () => {
-    const uid = auth.currentUser?.uid;
-
-    if (!uid || !db) return;
-
     if (!form.name.trim()) {
-      alert('Product name is required.');
+      setError('Product name is required.');
       return;
     }
-
-    const productRef = push(
-      ref(db, `sellerData/${uid}/products`)
-    );
-
-    await set(productRef, {
-      name: form.name.trim(),
-      sku: form.sku.trim(),
-      category: form.category.trim(),
-      description: form.description.trim(),
-      price: form.price.trim(),
-      status: 'draft',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    });
+    setSaving(true); setError('');
+    try { const data = await sellerWorkspaceRequest('', { method: 'POST', body: JSON.stringify({ resource: 'product', ...form }) }); setProducts((current) => [data.item, ...current]); }
+    catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Unable to create product.'); setSaving(false); return; }
 
     setForm({
       name: '',
@@ -89,23 +59,19 @@ export default function SellerProductsPage() {
     });
 
     setShowForm(false);
+    setSaving(false);
   };
 
   const deleteProduct = async (id: string) => {
-    const uid = auth.currentUser?.uid;
-
-    if (!uid || !db) return;
-
     if (!window.confirm('Delete this product?')) return;
-
-    await remove(
-      ref(db, `sellerData/${uid}/products/${id}`)
-    );
+    try { await sellerWorkspaceRequest(`?resource=product&id=${encodeURIComponent(id)}`, { method: 'DELETE' }); setProducts((current) => current.filter((item) => item.id !== id)); }
+    catch (deleteError) { setError(deleteError instanceof Error ? deleteError.message : 'Unable to delete product.'); }
   };
 
   return (
     <SellerLayout>
       <div className="space-y-6">
+        {error && <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-700 dark:text-red-300">{error}</div>}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
@@ -261,9 +227,10 @@ export default function SellerProductsPage() {
 
                 <button
                   onClick={createProduct}
+                  disabled={saving}
                   className="w-full rounded-xl bg-primary text-primary-foreground py-2.5 text-sm font-medium"
                 >
-                  Create Product
+                  {saving ? 'Creating…' : 'Create Product'}
                 </button>
               </div>
             </div>

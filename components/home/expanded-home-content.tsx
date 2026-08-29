@@ -680,7 +680,7 @@ export function ExpandedHomeContent() {
 
                 <div className="mt-8 flex flex-col sm:flex-row justify-center gap-3">
                   <Link
-                    href="/become-a-supplier"
+                    href="/supplier"
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-primary text-primary-foreground px-6 py-3 text-sm font-medium"
                   >
                     Submit Your Catalog

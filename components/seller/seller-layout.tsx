@@ -8,14 +8,13 @@ import { getData } from '@/lib/firebase-db';
 import { onAuthChange, signOut } from '@/lib/auth';
 import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, User, Package, FileText, MessageSquare, LifeBuoy, Settings, LogOut, Loader2, Store } from 'lucide-react';
+import { LayoutDashboard, User, Package, FileText, LifeBuoy, Settings, LogOut, Loader2 } from 'lucide-react';
 
 const NAV = [
   { label: 'Overview', href: '/seller/dashboard', icon: LayoutDashboard },
   { label: 'Profile', href: '/seller/profile', icon: User },
   { label: 'Products', href: '/seller/dashboard/products', icon: Package },
   { label: 'Catalogs', href: '/seller/dashboard/catalogs', icon: FileText },
-  { label: 'Messages', href: '/seller/dashboard/messages', icon: MessageSquare },
   { label: 'Support', href: '/seller/support', icon: LifeBuoy },
   { label: 'Settings', href: '/seller/settings', icon: Settings },
 ];

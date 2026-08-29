@@ -1,8 +1,8 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, onValue, update } from 'firebase/database';
-import { db, auth } from '@/lib/firebase';
+import { onAuthChange } from '@/lib/auth';
+import { sellerWorkspaceRequest } from '@/lib/seller-workspace-client';
 import { SellerLayout } from '@/components/seller/seller-layout';
 import { Loader2, Save } from 'lucide-react';
 
@@ -23,17 +23,14 @@ export default function SellerSettingsPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-
-    if (!uid || !db) {
-      setLoading(false);
-      return;
-    }
-
-    return onValue(ref(db, `users/${uid}`), (snapshot) => {
-      const data = snapshot.val() || {};
+    return onAuthChange(async (user) => {
+      if (!user) { setLoading(false); return; }
+      try {
+      const workspace = await sellerWorkspaceRequest(); const data = workspace.profile || {};
 
       setForm({
         displayName: data.displayName || data.name || '',
@@ -42,26 +39,25 @@ export default function SellerSettingsPage() {
         website: data.website || '',
       });
 
-      setLoading(false);
+      } catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'Unable to load settings.'); }
+      finally { setLoading(false); }
     });
   }, []);
 
   const save = async () => {
-    const uid = auth.currentUser?.uid;
-
-    if (!uid || !db) return;
-
-    setSaving(true);
+    setSaving(true); setError(''); setMessage('');
 
     try {
-      await update(ref(db, `users/${uid}`), {
+      await sellerWorkspaceRequest('', { method: 'PATCH', body: JSON.stringify({
         displayName: form.displayName.trim(),
         name: form.displayName.trim(),
         phone: form.phone.trim(),
         businessName: form.businessName.trim(),
         website: form.website.trim(),
-        updatedAt: Date.now(),
-      });
+      }) });
+      setMessage('Settings saved successfully.');
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Unable to save settings.');
     } finally {
       setSaving(false);
     }
@@ -86,6 +82,8 @@ export default function SellerSettingsPage() {
           </div>
         ) : (
           <div className="rounded-2xl border border-border bg-card p-6 space-y-5">
+            {error && <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-700 dark:text-red-300">{error}</div>}
+            {message && <div className="rounded-xl border border-green-500/20 bg-green-500/5 p-4 text-sm text-green-700 dark:text-green-300">{message}</div>}
             <Field
               label="Display Name"
               value={form.displayName}

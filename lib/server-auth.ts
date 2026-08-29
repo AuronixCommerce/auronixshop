@@ -42,3 +42,14 @@ export async function requireAdmin(request: Request) {
 
   return decoded;
 }
+
+export async function requireSeller(request: Request) {
+  const decoded = await verifyIdToken(request);
+  if (decoded.role === 'seller' || decoded.role === 'admin') return decoded;
+  const snapshot = await adminDb.ref(`users/${decoded.uid}`).get();
+  const profile = snapshot.val();
+  if (!snapshot.exists() || !['seller', 'admin'].includes(profile?.role) || profile?.status === 'disabled') {
+    throw new Error('Seller access required.');
+  }
+  return decoded;
+}

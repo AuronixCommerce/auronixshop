@@ -341,7 +341,7 @@ export function Header() {
             <div className="hidden items-center gap-2 lg:flex">
               <ThemeToggle />
               <Link
-                href="/become-a-supplier"
+                href="/supplier"
                 className="rounded-full px-4 py-2.5 font-sans text-[11px] font-semibold text-foreground-muted transition hover:bg-white/[0.06] hover:text-foreground"
               >
                 Become a Supplier

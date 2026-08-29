@@ -1,26 +1,22 @@
 ﻿'use client';
 
 import { useEffect, useState } from 'react';
-import { ref, onValue } from 'firebase/database';
-import { db, auth } from '@/lib/firebase';
+import { onAuthChange } from '@/lib/auth';
+import { sellerWorkspaceRequest } from '@/lib/seller-workspace-client';
 import { SellerLayout } from '@/components/seller/seller-layout';
 import { Loader2, UserRound } from 'lucide-react';
 
 export default function SellerProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-
-    if (!uid || !db) {
-      setLoading(false);
-      return;
-    }
-
-    return onValue(ref(db, `users/${uid}`), (snapshot) => {
-      setProfile(snapshot.val() || null);
-      setLoading(false);
+    return onAuthChange(async (user) => {
+      if (!user) { setLoading(false); return; }
+      try { const data = await sellerWorkspaceRequest(); setProfile(data.profile); }
+      catch (loadError) { setError(loadError instanceof Error ? loadError.message : 'Unable to load profile.'); }
+      finally { setLoading(false); }
     });
   }, []);
 
@@ -41,6 +37,8 @@ export default function SellerProfilePage() {
           <div className="rounded-2xl border border-border bg-card p-12 flex justify-center">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6 text-sm text-red-700 dark:text-red-300">{error}</div>
         ) : (
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="flex items-center gap-4 pb-6 border-b border-border">

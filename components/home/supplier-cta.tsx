@@ -49,7 +49,7 @@ export function SupplierCTA() {
           </p>
 
           <Link
-            href="/become-a-supplier"
+            href="/supplier"
             className="group mt-8 inline-flex items-center gap-2 rounded-full bg-primary-foreground px-6 py-3.5 text-sm font-medium text-primary hover:bg-primary-foreground/90 transition-all"
           >
             Become a Supplier

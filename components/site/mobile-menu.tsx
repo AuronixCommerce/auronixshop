@@ -26,7 +26,7 @@ const extraLinks = [
     label: 'Become a Seller',
   },
   {
-    href: '/become-a-supplier',
+    href: '/supplier',
     label: 'Become a Supplier',
   },
   {
