@@ -196,7 +196,7 @@ export function Header() {
                 }}
                 className="relative shrink-0"
               >
-                <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-primary shadow-[0_8px_30px_rgba(0,0,0,0.22)] sm:h-11 sm:w-11">
+                <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-zinc-950 shadow-[0_8px_30px_rgba(0,0,0,0.22)] dark:border-black/10 dark:bg-white sm:h-11 sm:w-11">
                   <motion.div
                     animate={{
                       scale: [
@@ -215,7 +215,7 @@ export function Header() {
                       repeat: Infinity,
                       ease: 'easeInOut',
                     }}
-                    className="h-4 w-4 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.45)] sm:h-[17px] sm:w-[17px]"
+                    className="h-4 w-4 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.45)] dark:bg-zinc-950 dark:shadow-[0_0_18px_rgba(0,0,0,0.22)] sm:h-[17px] sm:w-[17px]"
                   />
 
                   <motion.div
@@ -255,7 +255,7 @@ export function Header() {
 
             {/* DESKTOP NAV */}
             <nav
-              className="absolute left-1/2 hidden -translate-x-1/2 lg:block"
+              className="absolute left-1/2 hidden -translate-x-1/2 xl:block"
               aria-label="Main navigation"
             >
             <div className="flex items-center gap-0.5 rounded-full border border-white/10 bg-white/[0.025] p-1">
@@ -338,7 +338,7 @@ export function Header() {
             </nav>
 
             {/* DESKTOP ACTIONS */}
-            <div className="hidden items-center gap-2 lg:flex">
+            <div className="hidden items-center gap-2 xl:flex">
               <ThemeToggle />
               <Link
                 href="/supplier"
@@ -360,8 +360,7 @@ export function Header() {
             </div>
 
             {/* MOBILE BUTTON */}
-            <div className="flex shrink-0 items-center gap-2 lg:hidden">
-              <ThemeToggle />
+            <div className="flex shrink-0 items-center gap-2 xl:hidden">
               <button
                 type="button"
                 onClick={() =>

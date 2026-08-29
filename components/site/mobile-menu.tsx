@@ -102,7 +102,7 @@ export function MobileMenu({
               >
                 <motion.div
                   whileTap={{ scale: 0.95 }}
-                  className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-primary shadow-[0_8px_30px_rgba(0,0,0,0.22)]"
+                  className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-zinc-950 shadow-[0_8px_30px_rgba(0,0,0,0.22)] dark:border-black/10 dark:bg-white"
                 >
                   <motion.div
                     animate={{
@@ -114,7 +114,7 @@ export function MobileMenu({
                       repeat: Infinity,
                       ease: 'easeInOut',
                     }}
-                    className="h-4 w-4 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.45)]"
+                    className="h-4 w-4 rounded-full bg-white shadow-[0_0_18px_rgba(255,255,255,0.45)] dark:bg-zinc-950 dark:shadow-[0_0_18px_rgba(0,0,0,0.22)]"
                   />
 
                   <motion.div

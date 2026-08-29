@@ -198,38 +198,6 @@ h6 {
 }
 
 /* ------------------------------------------------------------
-   SELECTIVE EDITORIAL TYPE
-   ------------------------------------------------------------ */
-
-.auronix-safe-mixed {
-  font-family:
-    var(--font-inter),
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    sans-serif !important;
-
-  font-style:
-    italic !important;
-
-  font-weight:
-    800;
-
-  letter-spacing:
-    -0.055em;
-}
-
-.auronix-safe-underline {
-  font-family:
-    inherit !important;
-}
-
-.auronix-safe-highlight {
-  font-family:
-    inherit !important;
-}
-
-/* ------------------------------------------------------------
    REDUCED MOTION
    ------------------------------------------------------------ */
 

@@ -9,10 +9,6 @@ import {
 } from '@/components/site/ai-chat';
 
 import {
-  ScrollTextEffects,
-} from '@/components/site/scroll-text-effects';
-
-import {
   SiteAnnouncementPopup,
 } from '@/components/site/site-announcement-popup';
 
@@ -71,8 +67,6 @@ export function PublicRuntime({
       </PublicSiteChrome>
 
       <SiteAnnouncementPopup />
-
-      <ScrollTextEffects />
 
       <AIChat />
     </>

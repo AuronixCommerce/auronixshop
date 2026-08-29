@@ -21,7 +21,8 @@ export function ThemeToggle({ className, showLabel = false }: { className?: stri
       title={label}
       onClick={() => setTheme(dark ? 'light' : 'dark')}
       className={cn(
-        'inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-card/70 px-3 text-foreground shadow-sm backdrop-blur-xl transition hover:bg-secondary active:scale-95',
+        'inline-flex h-10 items-center justify-center gap-2 rounded-full border border-border/70 bg-card/80 text-foreground shadow-sm backdrop-blur-xl transition hover:bg-secondary active:scale-95',
+        showLabel ? 'w-full px-3' : 'w-10 shrink-0 p-0',
         className
       )}
     >

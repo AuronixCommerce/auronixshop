@@ -30,7 +30,13 @@ export function PublicSiteChrome({
     ) ||
     pathname.startsWith(
       '/auth'
-    );
+    ) ||
+    pathname.startsWith('/seller/activate') ||
+    pathname === '/seller/login' ||
+    pathname.startsWith('/seller/dashboard') ||
+    pathname === '/seller/profile' ||
+    pathname === '/seller/settings' ||
+    pathname === '/seller/support';
 
   if (
     isPrivateArea

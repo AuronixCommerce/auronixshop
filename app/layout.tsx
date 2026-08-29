@@ -18,10 +18,6 @@ import {
 } from '@/components/ui/toaster';
 
 import {
-  ScrollTextEffects,
-} from '@/components/site/scroll-text-effects';
-
-import {
   SiteAnnouncementPopup,
 } from '@/components/site/site-announcement-popup';
 

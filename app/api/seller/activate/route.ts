@@ -13,11 +13,11 @@ export async function POST(request: Request) {
     if (password.length < 8) return response('Password must be at least 8 characters.', 'PASSWORD_TOO_SHORT', 400);
 
     const tokenHash = hashInvitationToken(token);
-    const snapshot = await adminDb.ref('sellerApplications').orderByChild('invitationTokenHash').equalTo(tokenHash).limitToFirst(1).get();
-    if (!snapshot.exists()) return response('This invitation is invalid. Use the newest invitation email or ask support to resend it.', 'INVITATION_INVALID', 404);
-    const matches = snapshot.val() as Record<string, any>;
-    const applicationId = Object.keys(matches)[0];
-    const application = matches[applicationId];
+    const snapshot = await adminDb.ref('sellerApplications').get();
+    const applications = snapshot.exists() ? snapshot.val() as Record<string, any> : {};
+    const match = Object.entries(applications).find(([, candidate]) => candidate?.invitationTokenHash === tokenHash);
+    if (!match) return response('This invitation is invalid. Use the newest invitation email or ask support to resend it.', 'INVITATION_INVALID', 404);
+    const [applicationId, application] = match;
     const expires = Number(application.invitationExpires || 0);
     if (!expires || Date.now() >= expires) return response('This invitation has expired. Ask Auronix to send a new invitation.', 'INVITATION_EXPIRED', 410);
     if (application.invitationUsedAt) return response('This invitation has already been used. Sign in or reset your password.', 'INVITATION_USED', 409);
@@ -51,8 +51,10 @@ export async function POST(request: Request) {
       throw error;
     }
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Seller activation failed:', error instanceof Error ? error.message : 'Unknown error');
+  } catch (error: any) {
+    console.error('Seller activation failed:', error?.code || (error instanceof Error ? error.message : 'Unknown error'));
+    if (error?.code === 'auth/email-already-exists') return response('An account already exists for this email. Sign in or reset your password.', 'ACCOUNT_EXISTS', 409);
+    if (error?.code === 'auth/invalid-password') return response('Choose a stronger password with at least 8 characters.', 'INVALID_PASSWORD', 400);
     return response('Unable to create the seller account right now. Please retry or contact support.', 'ACTIVATION_FAILED', 500);
   }
 }
