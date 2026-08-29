@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Copy,
   ExternalLink,
+  KeyRound,
   Loader2,
   MessageCircle,
   Mail,
@@ -14,6 +15,7 @@ import {
   ArrowRight,
   Send,
   ShieldCheck,
+  X,
 } from 'lucide-react';
 
 const BUSINESS_TYPES = [
@@ -167,6 +169,7 @@ export default function SellerApplyPage() {
       setForm(current => ({ ...current, ...(data.form || {}) }));
       setVerificationId(data.whatsappVerificationId || ''); setVerificationStatus(data.whatsappVerified ? 'verified' : 'idle');
       setEmailVerified(Boolean(data.emailVerified)); setResumeOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (resumeError) { setError(resumeError instanceof Error ? resumeError.message : 'Unable to resume application.'); }
     finally { setSavingDraft(false); }
   };
@@ -418,11 +421,11 @@ export default function SellerApplyPage() {
         <form onSubmit={submitApplication} className="mx-auto mt-12 max-w-4xl space-y-6">
           <div className="rounded-3xl border border-border bg-card p-5 sm:p-6">
             <div className="grid grid-cols-5 gap-2">{['WhatsApp','Email','Business','Profile','Review'].map((label, index) => <div key={label} className="text-center"><div className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step >= index + 1 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground-muted'}`}>{index + 1}</div><div className="mt-2 hidden text-[10px] font-medium sm:block">{label}</div></div>)}</div>
-            {!draftId && <button type="button" onClick={() => setResumeOpen(value => !value)} className="mx-auto mt-5 block text-sm font-semibold text-accent hover:underline">Resume a saved application</button>}
-            {resumeOpen && !draftId && <div className="mx-auto mt-4 flex max-w-md flex-col gap-2 sm:flex-row"><input value={resumeInput} onChange={event => setResumeInput(event.target.value.toUpperCase())} placeholder="AX-XXXXXXXX" className="h-11 flex-1 rounded-xl border border-border bg-background px-4 font-mono text-sm" /><button type="button" onClick={resumeApplication} disabled={savingDraft || !resumeInput.trim()} className="rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50">Resume</button></div>}
-            {resumeOpen && !draftId && error && <div className="mx-auto max-w-md"><InlineError message={error} /></div>}
+            {!draftId && <div className="mt-5 flex justify-center"><button type="button" onClick={() => { setError(''); setResumeOpen(true); }} className="group inline-flex min-h-11 items-center gap-2 rounded-full border border-accent/25 bg-accent/10 px-5 py-2.5 text-sm font-semibold text-accent shadow-sm transition hover:-translate-y-0.5 hover:border-accent/45 hover:bg-accent/15 hover:shadow-md"><KeyRound className="h-4 w-4 transition-transform group-hover:-rotate-6" />Resume saved application<ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></button></div>}
             {resumeId && <div className="mt-5 flex flex-col items-center justify-between gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-4 sm:flex-row"><div><div className="text-xs font-semibold uppercase tracking-wider text-accent">Private resume ID</div><div className="mt-1 font-mono text-sm font-bold">{resumeId}</div></div><button type="button" onClick={copyResumeId} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-semibold"><Copy className="h-4 w-4" />{copiedResume ? 'Copied' : 'Copy ID'}</button></div>}
           </div>
+
+          {resumeOpen && !draftId && <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/55 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !savingDraft) setResumeOpen(false); }}><div role="dialog" aria-modal="true" aria-labelledby="resume-application-title" className="w-full max-w-lg overflow-hidden rounded-t-[30px] border border-border bg-background shadow-[0_30px_100px_rgba(0,0,0,0.35)] sm:rounded-[30px]"><div className="relative border-b border-border bg-gradient-to-br from-accent/15 via-background to-background px-6 pb-6 pt-7 sm:px-8"><button type="button" onClick={() => setResumeOpen(false)} disabled={savingDraft} aria-label="Close resume application" className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background/80 text-foreground-muted transition hover:bg-secondary hover:text-foreground disabled:opacity-50"><X className="h-4 w-4" /></button><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg"><KeyRound className="h-5 w-5" /></div><h2 id="resume-application-title" className="mt-5 text-2xl font-semibold tracking-tight">Continue your application</h2><p className="mt-2 max-w-md text-sm leading-6 text-foreground-muted">Enter the private resume ID sent to your verified email. We’ll securely restore your saved details and return you to the last completed step.</p></div><div className="space-y-4 px-6 py-6 sm:px-8"><label className="block"><span className="mb-2 block text-sm font-semibold">Private resume ID</span><input autoFocus value={resumeInput} onChange={event => { setError(''); setResumeInput(event.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 11)); }} onKeyDown={event => { if (event.key === 'Enter' && resumeInput.trim() && !savingDraft) { event.preventDefault(); void resumeApplication(); } }} placeholder="AX-XXXXXXXX" autoComplete="off" spellCheck={false} aria-invalid={Boolean(error)} className="h-14 w-full rounded-2xl border border-border bg-secondary/30 px-4 font-mono text-base font-semibold uppercase tracking-wider outline-none transition placeholder:font-sans placeholder:font-normal placeholder:tracking-normal focus:border-accent focus:ring-4 focus:ring-accent/10" /></label>{error && <InlineError message={error} />}<button type="button" onClick={resumeApplication} disabled={savingDraft || resumeInput.trim().length < 5} className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-6 py-3.5 text-sm font-semibold text-primary-foreground shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50">{savingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}{savingDraft ? 'Restoring your application…' : 'Resume application'}</button><div className="flex items-start gap-2 rounded-xl bg-secondary/50 p-3 text-xs leading-5 text-foreground-muted"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-accent" /><span>Your resume ID is private. Auronix will never ask for your password to restore an application.</span></div></div></div></div>}
 
           {step === 1 && <Section eyebrow="01" title="Verify WhatsApp Number" description="Enter your number with country code, then verify it through Auronix WhatsApp.">
             <div className="mb-5 max-w-md"><Field label="WhatsApp Phone" required value={form.phone} onChange={value => updateField('phone', value)} placeholder="+1 555 000 0000" /></div>

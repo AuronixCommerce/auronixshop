@@ -14,7 +14,7 @@ import { getData } from '@/lib/firebase-db';
 import { onAuthChange } from '@/lib/auth';
 import type { UserProfile, PartnerPortalData } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import { FileText, Package, ShieldCheck } from 'lucide-react';
+import { ArrowRight, FileText, LayoutDashboard, LifeBuoy, Package, Settings, ShieldCheck } from 'lucide-react';
 import Link from 'next/link';
 
 export default function PartnerPortalPage() {
@@ -23,6 +23,7 @@ export default function PartnerPortalPage() {
   const [loading, setLoading] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sellerWorkspace, setSellerWorkspace] = useState<any>(null);
 
   useEffect(() => {
     const unsub = onAuthChange(async (firebaseUser) => {
@@ -44,7 +45,7 @@ export default function PartnerPortalPage() {
 
         if (
           !profile ||
-          (profile.role !== 'partner' && profile.role !== 'admin')
+          (profile.role !== 'partner' && profile.role !== 'admin' && profile.role !== 'seller')
         ) {
           setUser(null);
           setData(null);
@@ -54,6 +55,13 @@ export default function PartnerPortalPage() {
         }
 
         setUser(profile);
+
+        if (profile.role === 'seller') {
+          const { sellerWorkspaceRequest } = await import('@/lib/seller-workspace-client');
+          setSellerWorkspace(await sellerWorkspaceRequest());
+          setData(null);
+          return;
+        }
 
         if (profile.partnerId) {
           const portalData = await getData<PartnerPortalData>(
@@ -134,14 +142,21 @@ export default function PartnerPortalPage() {
                 this portal.
               </p>
 
-              <Link href="/contact">
-                <Button>Contact Us</Button>
-              </Link>
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-center"><Link href="/seller/login"><Button>Seller login</Button></Link><Link href="/seller/apply"><Button variant="outline">Create seller account</Button></Link></div>
             </div>
           </Reveal>
         </Section>
       </SiteLayout>
     );
+  }
+
+  if (user.role === 'seller') {
+    const application = sellerWorkspace?.application;
+    const products = Array.isArray(sellerWorkspace?.products) ? sellerWorkspace.products : [];
+    const catalogs = Array.isArray(sellerWorkspace?.catalogs) ? sellerWorkspace.catalogs : [];
+    const tickets = Array.isArray(sellerWorkspace?.tickets) ? sellerWorkspace.tickets : [];
+    const active = user.status === 'active' && application?.status === 'active';
+    return <SiteLayout><PageHeader eyebrow="Seller Partner Portal" title={<>Welcome, {user.displayName || user.name || user.email}.</>} description="A secure launchpad for your Auronix seller workspace, catalog, products, profile, and support." /><Section className="border-t border-border"><div className="mb-6 flex flex-col gap-4 rounded-2xl border border-border bg-card p-6 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${active ? 'bg-green-500' : 'bg-amber-500'}`} /><span className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground-muted">Seller partnership</span></div><h2 className="mt-2 text-xl font-semibold">{active ? 'Account active and connected' : `Status: ${application?.status || user.status || 'pending'}`}</h2><p className="mt-1 text-sm text-foreground-muted">Your portal reads live information from your seller account.</p></div><Link href="/seller/dashboard" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground">Open full dashboard <ArrowRight className="h-4 w-4" /></Link></div><div className="grid gap-4 sm:grid-cols-3"><PortalMetric icon={Package} label="Products" value={products.length} href="/seller/dashboard/products" /><PortalMetric icon={FileText} label="Catalogs" value={catalogs.length} href="/seller/dashboard/catalogs" /><PortalMetric icon={LifeBuoy} label="Support tickets" value={tickets.length} href="/seller/support" /></div><div className="mt-8"><h2 className="mb-4 text-lg font-semibold">Seller tools</h2><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"><PortalAction icon={LayoutDashboard} title="Dashboard" description="See verification and live account status." href="/seller/dashboard" /><PortalAction icon={Package} title="Manage products" description="Add and maintain product drafts." href="/seller/dashboard/products" /><PortalAction icon={FileText} title="Catalog library" description="Connect current product catalogs." href="/seller/dashboard/catalogs" /><PortalAction icon={Settings} title="Account settings" description="Keep business details accurate." href="/seller/settings" /></div></div><div className="mt-8 rounded-2xl border border-accent/20 bg-accent/5 p-6"><div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-accent" /><div><h3 className="font-semibold">Need help with your partnership?</h3><p className="mt-1 text-sm leading-6 text-foreground-muted">Create a support ticket connected to your seller account. You can track its current status in real time.</p><Link href="/seller/support" className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-accent">Open seller support <ArrowRight className="h-4 w-4" /></Link></div></div></div></Section></SiteLayout>;
   }
 
   return (
@@ -312,4 +327,12 @@ export default function PartnerPortalPage() {
       </Section>
     </SiteLayout>
   );
+}
+
+function PortalMetric({ icon: Icon, label, value, href }: { icon: typeof Package; label: string; value: number; href: string }) {
+  return <Link href={href} className="group rounded-2xl border border-border bg-card p-5 transition hover:-translate-y-0.5 hover:shadow-premium"><div className="flex items-center justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent"><Icon className="h-4 w-4" /></span><ArrowRight className="h-4 w-4 text-foreground-muted transition group-hover:translate-x-0.5" /></div><div className="mt-5 text-2xl font-semibold">{value}</div><div className="mt-1 text-sm text-foreground-muted">{label}</div></Link>;
+}
+
+function PortalAction({ icon: Icon, title, description, href }: { icon: typeof Package; title: string; description: string; href: string }) {
+  return <Link href={href} className="group rounded-2xl border border-border bg-card p-5 transition hover:border-accent/30 hover:bg-secondary/30"><Icon className="h-5 w-5 text-accent" /><h3 className="mt-4 font-semibold">{title}</h3><p className="mt-1 text-sm leading-6 text-foreground-muted">{description}</p><span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-accent">Open <ArrowRight className="h-3.5 w-3.5 transition group-hover:translate-x-0.5" /></span></Link>;
 }

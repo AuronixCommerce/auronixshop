@@ -9,7 +9,11 @@ function safeHref(raw: string) {
 }
 
 function inline(value: string): ReactNode[] {
-  const tokens = value.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g);
+  const normalized = value
+    .replace(/\\([*_])/g, '$1')
+    .replace(/\*\*\s+([^*]+?)\s+\*\*/g, '**$1**')
+    .replace(/(?<!\*)\*\s+([^*]+?)\s+\*(?!\*)/g, '*$1*');
+  const tokens = normalized.split(/(\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\([^)]+\))/g);
   return tokens.filter(Boolean).map((token, index) => {
     if (token.startsWith('**') && token.endsWith('**')) return <strong key={index} className="font-semibold text-foreground">{token.slice(2, -2)}</strong>;
     if (token.startsWith('*') && token.endsWith('*')) return <em key={index} className="italic text-foreground/90">{token.slice(1, -1)}</em>;
