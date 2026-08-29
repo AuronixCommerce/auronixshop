@@ -103,6 +103,11 @@ const PUBLIC_ROUTES: Array<{
     priority: 0.7,
   },
   {
+    path: '/whats-new',
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  },
+  {
     path: '/privacy',
     changeFrequency: 'yearly',
     priority: 0.4,

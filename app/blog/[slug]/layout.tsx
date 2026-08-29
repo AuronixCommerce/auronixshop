@@ -105,10 +105,6 @@ export async function generateMetadata({
       path,
       type:
         'article',
-      image:
-        cleanText(
-          post?.image
-        ),
       keywords: [
         cleanText(
           post?.category

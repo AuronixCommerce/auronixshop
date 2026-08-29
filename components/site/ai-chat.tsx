@@ -23,6 +23,7 @@ import {
   AnimatePresence,
   motion,
 } from 'framer-motion';
+import { AuronixMark } from '@/components/site/auronix-mark';
 
 type Role = 'user' | 'assistant';
 
@@ -778,7 +779,7 @@ export function AIChat() {
               className="absolute inset-1 rounded-full bg-white/20 blur-md"
             />
 
-            <MessageCircle className="relative z-10 h-6 w-6" />
+            <ChatBrandMark className="h-10 w-10" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -811,7 +812,7 @@ export function AIChat() {
           >
             <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-3">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground">
+                <div className="relative flex h-10 w-10 shrink-0 items-center justify-center">
                   <motion.div
                     animate={{
                       scale: [
@@ -831,10 +832,9 @@ export function AIChat() {
                       ease:
                         'easeInOut',
                     }}
-                    className="absolute inset-2 rounded-full border border-white/30"
+                    className="absolute inset-1 rounded-full bg-accent/10 blur-sm"
                   />
-
-                  <MessageCircle className="relative z-10 h-5 w-5" />
+                  <ChatBrandMark className="h-9 w-9" />
                 </div>
 
                 <div className="min-w-0">
@@ -1058,3 +1058,7 @@ export function AIChat() {
 }
 
 export default AIChat;
+
+function ChatBrandMark({ className }: { className?: string }) {
+  return <span className={`relative inline-flex shrink-0 ${className || ''}`}><AuronixMark className="h-full w-full shadow-none" /><span className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-background bg-accent text-white shadow-sm"><Bot className="h-2.5 w-2.5" /></span></span>;
+}

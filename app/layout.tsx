@@ -37,6 +37,7 @@ import {
   getMaintenanceContext,
 } from '@/lib/server-maintenance-context';
 import { ThemeProvider } from '@/components/site/theme-provider';
+import { DEFAULT_KEYWORDS, SEO_SITE_NAME, SEO_SITE_URL, SEO_SOCIAL_IMAGE } from '@/lib/seo';
 
 const inter =
   Inter({
@@ -72,6 +73,8 @@ export const metadata: Metadata = {
   description:
     'Auronix Commerce LLC connects quality suppliers, brands, and products through structured procurement, sourcing, distribution, and modern marketplace operations.',
 
+  keywords: DEFAULT_KEYWORDS,
+
   alternates: {
     canonical:
       'https://auronixcommerce.com/',
@@ -80,7 +83,38 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+    googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
   },
+
+  openGraph: {
+    type: 'website',
+    locale: 'en_US',
+    url: SEO_SITE_URL,
+    siteName: SEO_SITE_NAME,
+    title: 'Auronix Commerce LLC | eCommerce, Procurement & Marketplace Operations',
+    description: 'Auronix Commerce LLC connects suppliers, brands, products, procurement, distribution, and modern marketplace operations.',
+    images: [{ url: SEO_SOCIAL_IMAGE, width: 1200, height: 630, alt: 'Auronix Commerce LLC' }],
+  },
+
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Auronix Commerce LLC | Modern Commerce Operations',
+    description: 'Supplier partnerships, product sourcing, procurement, distribution, and marketplace operations.',
+    images: [SEO_SOCIAL_IMAGE],
+  },
+
+  authors: [{ name: SEO_SITE_NAME, url: SEO_SITE_URL }],
+  creator: SEO_SITE_NAME,
+  publisher: SEO_SITE_NAME,
+  category: 'eCommerce',
+};
+
+const organizationSchema = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    { '@type': 'Organization', '@id': `${SEO_SITE_URL}/#organization`, name: SEO_SITE_NAME, url: SEO_SITE_URL, image: SEO_SOCIAL_IMAGE, email: 'business@auronixcommerce.com', description: 'Auronix Commerce LLC provides product sourcing, procurement, supplier partnerships, distribution, and marketplace operations.' },
+    { '@type': 'WebSite', '@id': `${SEO_SITE_URL}/#website`, url: SEO_SITE_URL, name: SEO_SITE_NAME, publisher: { '@id': `${SEO_SITE_URL}/#organization` }, inLanguage: 'en-US' },
+  ],
 };
 
 function strictBoolean(
@@ -272,6 +306,7 @@ export default async function RootLayout({
           name="theme-color"
           content="#0A0A0A"
         />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
       </head>
 
       <body

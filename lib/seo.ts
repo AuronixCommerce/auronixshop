@@ -7,6 +7,9 @@ export const SEO_SITE_URL =
 export const SEO_SITE_NAME =
   'Auronix Commerce LLC';
 
+export const SEO_SOCIAL_IMAGE =
+  'https://pub-6d8ed6ce9591489c885eda64cf2ea10f.r2.dev/AuronixCommerceLLC/auronix%20banner.png';
+
 export const DEFAULT_KEYWORDS = [
   'Auronix Commerce LLC',
   'eCommerce',
@@ -48,7 +51,7 @@ export function buildSeo({
       ? image.startsWith('http')
         ? image
         : `${SEO_SITE_URL}${image}`
-      : `${SEO_SITE_URL}/og-image.jpg`;
+      : SEO_SOCIAL_IMAGE;
 
   return {
     title,
@@ -132,6 +135,10 @@ export function buildSeo({
 
     publisher:
       SEO_SITE_NAME,
+
+    category: 'eCommerce',
+
+    referrer: 'origin-when-cross-origin',
   };
 }
 

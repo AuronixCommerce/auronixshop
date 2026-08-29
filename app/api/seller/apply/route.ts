@@ -81,21 +81,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Verify the selected email and WhatsApp number before submitting.' }, { status: 403 });
     }
 
-    for (const email of Array.from(new Set([businessEmail, personalEmail].filter(Boolean)))) {
-      try {
-        await adminAuth.getUserByEmail(email);
-        return NextResponse.json({ success: false, error: 'A seller account already exists for this email. Sign in or reset your password instead.', code: 'SELLER_ACCOUNT_EXISTS' }, { status: 409 });
-      } catch (accountError: any) {
-        if (accountError?.code !== 'auth/user-not-found') throw accountError;
-      }
+    try {
+      await adminAuth.getUserByEmail(preferredContactEmail);
+      return NextResponse.json({ success: false, error: `An account already exists for the selected ${preferredContact} email. Choose another email, sign in, or reset its password.`, field: preferredContact === 'personal' ? 'personalEmail' : 'businessEmail', code: 'SELLER_ACCOUNT_EXISTS' }, { status: 409 });
+    } catch (accountError: any) {
+      if (accountError?.code !== 'auth/user-not-found') throw accountError;
     }
 
     const applicationsSnapshot = await adminDb.ref('sellerApplications').get();
     if (applicationsSnapshot.exists()) {
       for (const application of Object.values(applicationsSnapshot.val() as Record<string, any>)) {
         const emails = [application.businessEmail, application.personalEmail, application.preferredContactEmail, application.email].map(normalizeEmail);
-        if (emails.some((email) => [businessEmail, personalEmail].includes(email)) && ACTIVE_APPLICATION_STATUSES.has(String(application.status || 'pending').toLowerCase())) {
-          return NextResponse.json({ success: false, error: 'An active seller application already exists for this email. Check your inbox or contact support for its status.', code: 'APPLICATION_ALREADY_EXISTS' }, { status: 409 });
+        if (emails.includes(preferredContactEmail) && ACTIVE_APPLICATION_STATUSES.has(String(application.status || 'pending').toLowerCase())) {
+          return NextResponse.json({ success: false, error: `An active seller application already exists for the selected ${preferredContact} email. Resume that application or contact support.`, field: preferredContact === 'personal' ? 'personalEmail' : 'businessEmail', code: 'APPLICATION_ALREADY_EXISTS' }, { status: 409 });
         }
       }
     }

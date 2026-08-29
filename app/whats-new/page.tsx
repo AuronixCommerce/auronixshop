@@ -38,6 +38,7 @@ const PLATFORM_RELEASE: Release = {
     'Supplier application experience with structured validation and database persistence.',
   ],
   fixes: [
+    'Seller submission now validates only the selected verified email, so an old unselected email cannot incorrectly block submission.',
     'Maintenance toggles now persist immediately, remain off after reload, and cannot be silently reactivated by stale schedules or health checks.',
     'Stopping an AI answer now preserves only the response text that was visible when Stop was pressed.',
     'Seller approval invitations and password reset links now use secure, reliable token handling.',
@@ -45,6 +46,8 @@ const PLATFORM_RELEASE: Release = {
     'Legal-page bold text, italics, links, and lists now render instead of appearing as raw symbols.',
   ],
   improvements: [
+    'Dedicated page SEO, crawl controls, structured organization data, enriched social cards, and a unified Auronix banner preview across search and social platforms.',
+    'Auronix AI now uses the circular Auronix brand mark with a compact AI badge in the launcher and chat header.',
     'Consistent Auronix circular brand mark across public, seller, admin, and account screens.',
     'Responsive navigation and theme controls with improved desktop and mobile spacing.',
     'Live legal-content preview for administrators before publishing updates.',

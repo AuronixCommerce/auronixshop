@@ -353,7 +353,15 @@ export default function SellerApplyPage() {
       });
 
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Unable to submit your application.');
+      if (!response.ok) {
+        if (data.code === 'SELLER_ACCOUNT_EXISTS' || data.code === 'APPLICATION_ALREADY_EXISTS') {
+          setStep(2);
+          setEmailVerified(false);
+          setEmailCodeSent(false);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        throw new Error(data.error || 'Unable to submit your application.');
+      }
 
       setSubmittedId(String(data.applicationId || ''));
       setSubmitted(true);

@@ -13,6 +13,7 @@ const digest = (value: string) => createHash('sha256').update(value).digest('hex
 const secret = () => process.env.SELLER_APPLICATION_OTP_SECRET?.trim() || process.env.SELLER_WHATSAPP_OTP_SECRET?.trim() || process.env.AURONIX_VERIFY_SECRET?.trim() || '';
 const otpHash = (draftId: string, email: string, code: string) => createHmac('sha256', secret()).update(`${draftId}:${email}:${code}`).digest('hex');
 const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+const ACTIVE_APPLICATION_STATUSES = new Set(['pending', 'screening', 'approved', 'invited', 'active']);
 const cleanCode = (value: unknown) => String(value || '').trim().toUpperCase().replace(/\s+/g, '');
 const publicDraft = (value: any) => ({ draftId: value.id, resumeId: value.resumeIdLabel, step: Number(value.step || 1), form: value.form || {}, whatsappVerificationId: value.whatsappVerificationId || '', whatsappVerified: Boolean(value.whatsappVerified), emailVerified: Boolean(value.emailVerified), emailVerifiedAddress: value.emailVerifiedAddress || '' });
 
@@ -73,6 +74,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'A seller account already exists for this email. Use Seller Login or reset the password instead.' }, { status: 409 });
       } catch (accountError: any) {
         if (accountError?.code !== 'auth/user-not-found') throw accountError;
+      }
+      const applications = await adminDb.ref('sellerApplications').get();
+      if (applications.exists()) {
+        for (const application of Object.values(applications.val() as Record<string, any>)) {
+          const knownEmails = [application.businessEmail, application.personalEmail, application.preferredContactEmail, application.email].map(normalizeEmail).filter(Boolean);
+          if (knownEmails.includes(email) && ACTIVE_APPLICATION_STATUSES.has(String(application.status || 'pending').toLowerCase())) {
+            return NextResponse.json({ error: 'An active seller application already exists for this email. Resume it or contact support.', code: 'APPLICATION_ALREADY_EXISTS' }, { status: 409 });
+          }
+        }
       }
       const now = Date.now();
       const requestedAt = Number(draft.emailOtpRequestedAt || 0);
