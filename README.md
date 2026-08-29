@@ -25,3 +25,23 @@ Configure these values in Vercel for Preview and Production. Never commit mailbo
 The SMTP provider must authorize the configured From addresses for the authenticated domain. Password-reset and seller-invitation messages use `MAIL_NOTIFICATION_FROM`; human support and business replies use `MAIL_BUSINESS_FROM` with `MAIL_REPLY_TO`.
 
 After changing environment values, redeploy so server routes receive them.
+
+## Auronix Select storefront
+
+The Amazon affiliate storefront is served from `/shop` and is rewritten to the
+root path when the request hostname is `shop.auronixcommerce.com`.
+
+- `NEXT_PUBLIC_SHOP_SITE_URL=https://shop.auronixcommerce.com`
+- `NEXT_PUBLIC_AMAZON_STOREFRONT_URL=https://www.amazon.com` (change for the approved Associates marketplace)
+- `NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG` (the approved Amazon Associates tracking ID; omit locally for untagged links)
+- `SHOP_PRIMARY_HOST=true` for a dedicated shop deployment so Vercel Preview and Production root URLs render the storefront
+
+Add the shop hostname to the same deployment and point its DNS to the deployment
+provider. Keep the marketplace URL and tracking ID aligned with the approved
+Amazon Associates account. Product pages intentionally omit dynamic price,
+availability, rating, review, discount, and seller data.
+
+The included `vercel.json` selects the Next.js framework and makes the storefront
+the primary host for this dedicated repository. In Vercel, also configure all
+existing Firebase and mail variables listed above because the repository retains
+the corporate and administration routes.

@@ -153,9 +153,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   try {
     const snapshot =
-      await adminDb
-        .ref('blogPosts')
-        .get();
+      await Promise.race([
+        adminDb
+          .ref('blogPosts')
+          .get(),
+        new Promise<never>((_, reject) => {
+          setTimeout(
+            () => reject(new Error('Sitemap blog lookup timed out')),
+            5000
+          );
+        }),
+      ]);
 
     if (
       snapshot.exists()

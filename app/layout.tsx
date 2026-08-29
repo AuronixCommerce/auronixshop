@@ -165,6 +165,10 @@ export default async function RootLayout({
       '/admin/'
     );
 
+  const isShop =
+    pathname === '/shop' ||
+    pathname.startsWith('/shop/');
+
   /*
    * ==========================================================
    * MAINTENANCE CHECK
@@ -181,6 +185,7 @@ export default async function RootLayout({
 
   if (
     !isAdmin &&
+    !isShop &&
     !pathname.startsWith(
       '/api/'
     ) &&
