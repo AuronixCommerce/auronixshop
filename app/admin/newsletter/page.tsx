@@ -4,6 +4,7 @@ import {
   useEffect,
   useState,
 } from 'react';
+import Link from 'next/link';
 
 import {
   onValue,
@@ -698,6 +699,10 @@ export default function AdminNewsletterPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+
+            <Link href="/admin/newsletter/reasons" className="col-span-2 inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold transition hover:bg-secondary">
+              View unsubscribe reasons
+            </Link>
 
             <div className="rounded-2xl border border-border bg-card p-4">
               <Users className="h-4 w-4 text-foreground-muted" />

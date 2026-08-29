@@ -68,6 +68,13 @@ export async function sendSellerResumeIdEmail(input: { email: string; resumeId: 
   return sendNotificationMail({ to: input.email, subject: 'Resume your Auronix seller application', html, text: `Your seller application progress is saved. Resume at ${url} using private resume ID: ${input.resumeId}.` });
 }
 
+export async function sendNewsletterUnsubscribeEmail(input: { email: string; unsubscribeUrl: string; code: string; expiresAt: number }) {
+  const url = safeAbsoluteUrl(input.unsubscribeUrl, `${SITE_URL}/newsletter/unsubscribe`);
+  const expiry = new Date(input.expiresAt).toLocaleTimeString('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
+  const html = emailShell({ preheader: 'Confirm that you want to stop receiving Auronix Commerce newsletters.', title: 'Confirm newsletter unsubscribe', footerNote: 'This link and verification code expire soon. If you did not request this, no action is required.', body: `<h1 style="margin:0 0 16px;font-size:27px;line-height:1.2">Unsubscribe from newsletters?</h1><p>We received a request to stop newsletter emails for <strong>${escapeHtml(input.email)}</strong>.</p>${cta('Review unsubscribe request', url)}<p>Or enter this six-digit confirmation code on the unsubscribe page:</p><div style="margin:22px 0;padding:17px;border-radius:14px;background:#f3f4f6;text-align:center;font-size:30px;font-weight:800;letter-spacing:.22em">${escapeHtml(input.code)}</div><p style="color:#6b7280;font-size:13px">The link and code expire at <strong>${escapeHtml(expiry)} UTC</strong>. You will remain subscribed until you confirm.</p>` });
+  return sendNotificationMail({ to: input.email, subject: 'Confirm your Auronix newsletter unsubscribe request', html, text: `Confirm that you want to unsubscribe from Auronix Commerce newsletters:\n${url}\n\nConfirmation code: ${input.code}\nExpires at ${expiry} UTC. If you did not request this, no action is required.` });
+}
+
 export async function sendTicketResponseEmail(input: any, positionalSubject?: string, positionalMessage?: string) {
   if (typeof input === 'string') input = { email: input, subject: positionalSubject, message: positionalMessage };
   const message = String(input.message || input.response || input.body || input.text || '');

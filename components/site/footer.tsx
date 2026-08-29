@@ -484,7 +484,7 @@ export function Footer() {
           )}
 
           <p className="mt-4 text-xs leading-5 text-foreground-muted">
-            You can unsubscribe from any newsletter email at any time.
+            You can <Link href="/newsletter/unsubscribe" className="font-medium text-accent underline decoration-accent/35 underline-offset-2 hover:decoration-accent">unsubscribe</Link> from newsletter emails at any time.
           </p>
         </div>
 
