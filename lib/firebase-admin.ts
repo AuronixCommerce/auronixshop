@@ -1,6 +1,8 @@
 ﻿import { cert, getApps, initializeApp, getApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getDatabase } from 'firebase-admin/database';
+import type { Auth } from 'firebase-admin/auth';
+import type { Database } from 'firebase-admin/database';
 
 function createAdminApp() {
   const existing = getApps();
@@ -36,8 +38,26 @@ function createAdminApp() {
   });
 }
 
-const adminApp = createAdminApp();
+function lazyService<T extends object>(factory: () => T): T {
+  return new Proxy({} as T, {
+    get(_target, property) {
+      const service = factory();
+      const value = Reflect.get(service, property, service);
 
-export const adminAuth = getAuth(adminApp);
-export const adminDb = getDatabase(adminApp);
-export default adminApp;
+      return typeof value === 'function'
+        ? value.bind(service)
+        : value;
+    },
+  });
+}
+
+/* Next.js imports routes during builds, so initialize Firebase on first use. */
+export const adminAuth: Auth = lazyService(() =>
+  getAuth(createAdminApp())
+);
+
+export const adminDb: Database = lazyService(() =>
+  getDatabase(createAdminApp())
+);
+
+export default createAdminApp;
