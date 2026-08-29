@@ -56,12 +56,19 @@ function numberOrNull(
 function encodePath(
   path: string
 ): string {
+  const normalized = normalizePath(path);
   return (
-    path
+    normalized
       .replace(/^\/+/, '')
       .replace(/\//g, '__') ||
     'home'
   );
+}
+
+function normalizePath(path: string): string {
+  const value = String(path || '/').trim().split('?')[0].split('#')[0];
+  if (!value || value === '/') return '/';
+  return `/${value.replace(/^\/+|\/+$/g, '')}`;
 }
 
 function normalizePages(
@@ -224,6 +231,36 @@ export async function POST(
         body.action
       );
 
+    if (action === 'disable-all') {
+      const snapshot = await adminDb.ref('sitePageControls').get();
+      const stored = snapshot.exists() ? snapshot.val() : {};
+      const updates: Record<string, unknown> = {
+        'global/maintenanceEnabled': false,
+        'global/scheduleEnabled': false,
+        'global/scheduleStartAt': null,
+        'global/scheduleEndAt': null,
+        'global/automaticFullSiteShutdown': false,
+        'global/updatedAt': Date.now(),
+        'global/updatedBy': 'admin-emergency-off',
+      };
+      for (const key of Object.keys(stored?.pages || {})) {
+        updates[`pages/${key}/maintenanceEnabled`] = false;
+        updates[`pages/${key}/scheduleEnabled`] = false;
+        updates[`pages/${key}/scheduleStartAt`] = null;
+        updates[`pages/${key}/scheduleEndAt`] = null;
+        updates[`pages/${key}/automaticMaintenanceEnabled`] = false;
+        updates[`pages/${key}/healthStatus`] = 'healthy';
+        updates[`pages/${key}/healthScore`] = 100;
+        updates[`pages/${key}/consecutiveFailures`] = 0;
+        updates[`pages/${key}/lastError`] = '';
+        updates[`pages/${key}/updatedAt`] = Date.now();
+        updates[`pages/${key}/updatedBy`] = 'admin-emergency-off';
+      }
+      await adminDb.ref('sitePageControls').update(updates);
+      await audit('ALL_MAINTENANCE_DISABLED', '*', { pageCount: Object.keys(stored?.pages || {}).length });
+      return NextResponse.json({ success: true });
+    }
+
     if (
       action ===
       'global'
@@ -320,10 +357,11 @@ export async function POST(
       action ===
       'page'
     ) {
-      const path =
+      const path = normalizePath(
         text(
           body.path
-        );
+        )
+      );
 
       if (
         !path
@@ -438,8 +476,7 @@ export async function POST(
           ),
 
         automaticMaintenanceEnabled:
-          body.automaticMaintenanceEnabled !==
-          false,
+          bool(body.automaticMaintenanceEnabled),
 
         automaticRecoveryEnabled:
           bool(

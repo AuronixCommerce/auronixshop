@@ -108,7 +108,7 @@ export const DEFAULT_PAGE_CONTROL: PageControl = {
     null,
 
   automaticMaintenanceEnabled:
-    true,
+    false,
 
   automaticRecoveryEnabled:
     false,

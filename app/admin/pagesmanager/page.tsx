@@ -771,6 +771,7 @@ export default function AdminPagesManagerPage() {
         ...old,
         maintenanceEnabled:
           nextEnabled,
+        ...(!nextEnabled ? { scheduleEnabled: false, scheduleStartAt: null, scheduleEndAt: null } : {}),
       })
     );
 
@@ -795,6 +796,7 @@ export default function AdminPagesManagerPage() {
 
                 maintenanceEnabled:
                   nextEnabled,
+                ...(!nextEnabled ? { scheduleEnabled: false, scheduleStartAt: null, scheduleEndAt: null } : {}),
               }),
           }
         );
@@ -819,6 +821,7 @@ export default function AdminPagesManagerPage() {
 
         maintenanceEnabled:
           nextEnabled,
+        ...(!nextEnabled ? { scheduleEnabled: false, scheduleStartAt: null, scheduleEndAt: null } : {}),
       });
 
       setNotice(
@@ -838,6 +841,54 @@ export default function AdminPagesManagerPage() {
       setSaving(
         false
       );
+    }
+  }
+
+  async function togglePageMaintenance(value: boolean) {
+    if (!selectedPage || saving) return;
+    const next = {
+      ...current,
+      maintenanceEnabled: value,
+      ...(!value ? {
+        scheduleEnabled: false,
+        scheduleStartAt: null,
+        scheduleEndAt: null,
+        automaticMaintenanceEnabled: false,
+        healthStatus: 'healthy' as const,
+        healthScore: 100,
+        consecutiveFailures: 0,
+        lastError: '',
+      } : {}),
+    };
+    setPages(old => ({ ...old, [selectedPage.path]: next }));
+    setSaving(true);
+    try {
+      const response = await api('/api/admin/page-controls', { method: 'POST', body: JSON.stringify({ action: 'page', ...next }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Unable to change page maintenance.');
+      setPages(old => ({ ...old, [selectedPage.path]: { ...EMPTY_PAGE, ...(data.page || next), path: selectedPage.path } }));
+      setNotice(value ? `🚨 ${selectedPage.title} maintenance is now ON.` : `✅ ${selectedPage.title} maintenance is now fully OFF.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to change page maintenance.');
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function disableAllMaintenance() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const response = await api('/api/admin/page-controls', { method: 'POST', body: JSON.stringify({ action: 'disable-all' }) });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Unable to disable all maintenance.');
+      await load();
+      setNotice('✅ All website and page maintenance is fully OFF. Schedules and automatic reactivation were also disabled.');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to disable all maintenance.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -1414,6 +1465,16 @@ export default function AdminPagesManagerPage() {
 
                   <button
                     type="button"
+                    disabled={saving}
+                    onClick={disableAllMaintenance}
+                    className="inline-flex items-center gap-2 rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-2.5 text-xs font-bold text-green-700 hover:bg-green-500/15 disabled:opacity-50"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    Turn All Maintenance OFF
+                  </button>
+
+                  <button
+                    type="button"
                     disabled={
                       saving
                     }
@@ -1941,14 +2002,7 @@ export default function AdminPagesManagerPage() {
                       enabled={
                         current.maintenanceEnabled
                       }
-                      onChange={(
-                        value
-                      ) =>
-                        updatePage(
-                          'maintenanceEnabled',
-                          value
-                        )
-                      }
+                      onChange={togglePageMaintenance}
                     />
 
                   </div>

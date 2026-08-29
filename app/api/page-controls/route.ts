@@ -7,6 +7,9 @@ import {
   DEFAULT_PAGE_CONTROL,
 } from '@/lib/page-controls';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 function decodeKey(
   key: string
 ): string {
@@ -70,10 +73,11 @@ export async function GET(
       request.url
     );
 
-    const path =
+    const rawPath =
       url.searchParams.get(
         'path'
       ) || '/';
+    const path = rawPath === '/' ? '/' : `/${rawPath.split('?')[0].split('#')[0].replace(/^\/+|\/+$/g, '')}`;
 
     const snapshot =
       await adminDb

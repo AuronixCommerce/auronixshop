@@ -63,6 +63,7 @@ function text(
 export async function getMaintenanceContext(
   pathname = '/'
 ) {
+  const requestedPath = pathname === '/' ? '/' : `/${String(pathname).split('?')[0].split('#')[0].replace(/^\/+|\/+$/g, '')}`;
   const snapshot =
     await adminDb
       .ref('sitePageControls')
@@ -80,7 +81,7 @@ export async function getMaintenanceContext(
 
   let page = {
     ...DEFAULT_PAGE_CONTROL,
-    path: pathname,
+    path: requestedPath,
   } as any;
 
   if (
@@ -101,11 +102,12 @@ export async function getMaintenanceContext(
           ? value.path
           : decodeKey(key);
 
-      if (path === pathname) {
+      const normalizedStoredPath = path === '/' ? '/' : `/${String(path).replace(/^\/+|\/+$/g, '')}`;
+      if (normalizedStoredPath === requestedPath) {
         page = {
           ...DEFAULT_PAGE_CONTROL,
           ...(value || {}),
-          path: pathname,
+          path: requestedPath,
         };
 
         break;
@@ -335,7 +337,7 @@ export async function getMaintenanceContext(
     },
 
     page: {
-      path: pathname,
+      path: requestedPath,
 
       scheduled:
         pageScheduleEnabled,
@@ -365,7 +367,7 @@ export async function getMaintenanceContext(
       message:
         text(
           page.maintenanceMessage,
-          `The page ${pathname} is currently undergoing maintenance.`
+          `The page ${requestedPath} is currently undergoing maintenance.`
         ),
 
       aiMaintenanceEnabled:

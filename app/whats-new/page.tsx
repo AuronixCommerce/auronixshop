@@ -38,6 +38,7 @@ const PLATFORM_RELEASE: Release = {
     'Supplier application experience with structured validation and database persistence.',
   ],
   fixes: [
+    'Maintenance toggles now persist immediately, remain off after reload, and cannot be silently reactivated by stale schedules or health checks.',
     'Stopping an AI answer now preserves only the response text that was visible when Stop was pressed.',
     'Seller approval invitations and password reset links now use secure, reliable token handling.',
     'Cookie Policy links now resolve correctly, including compatibility for older /cookies links.',
