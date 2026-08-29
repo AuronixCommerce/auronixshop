@@ -8,7 +8,7 @@ import { normalizeEmail } from '@/lib/server-seller-invitations';
 export const runtime = 'nodejs';
 
 const SELLER_POLICY_VERSION = '2026-08-15';
-const APPLICATION_VERSION = 'seller-application-v6-whatsapp';
+const APPLICATION_VERSION = 'seller-application-v7-resumable-email-verified';
 const ACTIVE_APPLICATION_STATUSES = new Set(['pending', 'screening', 'approved', 'invited', 'active']);
 const emailKey = (email: string) => createHash('sha256').update(email).digest('hex');
 
@@ -25,6 +25,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const form = body?.form || {};
     const verificationId = text(body?.verificationId);
+    const draftId = text(body?.draftId);
+    const resumeId = text(body?.resumeId).toUpperCase().replace(/\s+/g, '');
 
     if (!verificationId) {
       return NextResponse.json(
@@ -36,8 +38,6 @@ export async function POST(request: Request) {
     const required: Array<[string, string]> = [
       ['Full Name', text(form.fullName)],
       ['Business Name', text(form.businessName)],
-      ['Business Email', text(form.businessEmail)],
-      ['Personal Email', text(form.personalEmail)],
       ['Phone', text(form.phone)],
       ['Country', text(form.country)],
       ['Street Address', text(form.address)],
@@ -58,10 +58,6 @@ export async function POST(request: Request) {
 
     const businessEmail = normalizeEmail(form.businessEmail);
     const personalEmail = normalizeEmail(form.personalEmail);
-    if (!validEmail(businessEmail) || !validEmail(personalEmail)) {
-      return NextResponse.json({ success: false, error: 'Please enter valid email addresses.' }, { status: 400 });
-    }
-
     if (form.sellerPolicyAgreement !== true || form.contactAgreement !== true) {
       return NextResponse.json({ success: false, error: 'Seller Policy and contact agreements are required.' }, { status: 400 });
     }
@@ -71,8 +67,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Select your preferred contact email.' }, { status: 400 });
     }
     const preferredContactEmail = preferredContact === 'personal' ? personalEmail : businessEmail;
+    if (!validEmail(preferredContactEmail) || (businessEmail && !validEmail(businessEmail)) || (personalEmail && !validEmail(personalEmail))) {
+      return NextResponse.json({ success: false, error: 'Please enter a valid selected contact email.' }, { status: 400 });
+    }
 
-    for (const email of Array.from(new Set([businessEmail, personalEmail]))) {
+    if (!draftId || !resumeId) {
+      return NextResponse.json({ success: false, error: 'A saved and email-verified application session is required.' }, { status: 403 });
+    }
+    const draftSnapshot = await adminDb.ref(`sellerApplicationDrafts/${draftId}`).get();
+    const draft = draftSnapshot.exists() ? draftSnapshot.val() : null;
+    const resumeCodeHash = createHash('sha256').update(resumeId).digest('hex');
+    if (!draft || draft.resumeCodeHash !== resumeCodeHash || !draft.emailVerified || normalizeEmail(draft.emailVerifiedAddress) !== preferredContactEmail || draft.whatsappVerificationId !== verificationId) {
+      return NextResponse.json({ success: false, error: 'Verify the selected email and WhatsApp number before submitting.' }, { status: 403 });
+    }
+
+    for (const email of Array.from(new Set([businessEmail, personalEmail].filter(Boolean)))) {
       try {
         await adminAuth.getUserByEmail(email);
         return NextResponse.json({ success: false, error: 'A seller account already exists for this email. Sign in or reset your password instead.', code: 'SELLER_ACCOUNT_EXISTS' }, { status: 409 });
@@ -176,6 +185,9 @@ export async function POST(request: Request) {
       whatsappPhone: normalizedPhone,
       whatsappVerifiedAt: Number(verification.verifiedAt),
       whatsappVerificationId: verificationId,
+      emailVerified: true,
+      emailVerifiedAt: Number(draft.emailVerifiedAt || timestamp),
+      applicationDraftId: draftId,
       aiStatus: 'PENDING',
       aiScore: 0,
       aiAutoEligible: false,
@@ -192,6 +204,8 @@ export async function POST(request: Request) {
     try {
       await applicationRef.set(application);
       await verificationRef.update({ consumedAt: timestamp, applicationId, updatedAt: timestamp });
+      await adminDb.ref(`sellerApplicationDrafts/${draftId}`).update({ status: 'submitted', submittedAt: timestamp, applicationId, updatedAt: timestamp });
+      await adminDb.ref(`sellerApplicationResumeIndex/${resumeCodeHash}`).remove();
     } catch (persistenceError) {
       await applicationRef.remove().catch(() => undefined);
       await emailIndexRef.transaction((current) => current?.applicationId === applicationId ? null : current).catch(() => undefined);

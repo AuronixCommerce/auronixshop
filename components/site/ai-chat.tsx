@@ -481,8 +481,9 @@ export function AIChat() {
       typingTimerRef.current = null;
     }
 
-    const partial =
-      currentAnswerRef.current;
+    // Keep only what the visitor has actually seen. The full answer is already
+    // buffered in currentAnswerRef while the typewriter animation is running.
+    const partial = visibleAnswer;
 
     if (partial.trim()) {
       setMessages((existing) => [

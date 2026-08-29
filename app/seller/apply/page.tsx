@@ -9,6 +9,9 @@ import {
   ExternalLink,
   Loader2,
   MessageCircle,
+  Mail,
+  ArrowLeft,
+  ArrowRight,
   Send,
   ShieldCheck,
 } from 'lucide-react';
@@ -104,6 +107,18 @@ export default function SellerApplyPage() {
   const [requestingVerification, setRequestingVerification] = useState(false);
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [copiedNumber, setCopiedNumber] = useState(false);
+  const [step, setStep] = useState(1);
+  const [draftId, setDraftId] = useState('');
+  const [resumeId, setResumeId] = useState('');
+  const [resumeInput, setResumeInput] = useState('');
+  const [resumeOpen, setResumeOpen] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [emailOtp, setEmailOtp] = useState('');
+  const [emailCodeSent, setEmailCodeSent] = useState(false);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailBusy, setEmailBusy] = useState(false);
+  const [copiedResume, setCopiedResume] = useState(false);
+  const [submittedId, setSubmittedId] = useState('');
 
   const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setForm(current => ({ ...current, [field]: value }));
@@ -116,7 +131,62 @@ export default function SellerApplyPage() {
       setOtp('');
       setCopiedNumber(false);
     }
+    if (field === 'businessEmail' || field === 'personalEmail' || field === 'preferredContact') {
+      setEmailVerified(false);
+      setEmailCodeSent(false);
+      setEmailOtp('');
+    }
   };
+
+  const draftRequest = async (payload: Record<string, unknown>) => {
+    const response = await fetch('/api/seller/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Unable to save application progress.');
+    return data;
+  };
+
+  const createDraft = async () => {
+    const data = await draftRequest({ action: 'start', verificationId, phone: form.phone });
+    setDraftId(data.draftId); setResumeId(data.resumeId); setStep(2);
+  };
+
+  const resumeApplication = async () => {
+    setSavingDraft(true); setError('');
+    try {
+      const data = await draftRequest({ action: 'resume', resumeId: resumeInput });
+      setDraftId(data.draftId); setResumeId(data.resumeId); setStep(data.step || 1);
+      setForm(current => ({ ...current, ...(data.form || {}) }));
+      setVerificationId(data.whatsappVerificationId || ''); setVerificationStatus(data.whatsappVerified ? 'verified' : 'idle');
+      setEmailVerified(Boolean(data.emailVerified)); setResumeOpen(false);
+    } catch (resumeError) { setError(resumeError instanceof Error ? resumeError.message : 'Unable to resume application.'); }
+    finally { setSavingDraft(false); }
+  };
+
+  const saveStep = async (nextStep: number) => {
+    if (!draftId || !resumeId) return;
+    setSavingDraft(true); setError('');
+    try { await draftRequest({ action: 'save', draftId, resumeId, form, step: nextStep }); setStep(nextStep); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    catch (saveError) { setError(saveError instanceof Error ? saveError.message : 'Unable to save this step.'); }
+    finally { setSavingDraft(false); }
+  };
+
+  const selectedEmail = form.preferredContact === 'personal' ? form.personalEmail : form.preferredContact === 'business' ? form.businessEmail : '';
+  const requestEmailCode = async () => {
+    if (!form.preferredContact || !validEmail(selectedEmail)) { setError('Select personal or business email and enter a valid address.'); return; }
+    setEmailBusy(true); setError('');
+    try { await draftRequest({ action: 'email-request', draftId, resumeId, emailType: form.preferredContact, email: selectedEmail }); setEmailCodeSent(true); }
+    catch (emailError) { setError(emailError instanceof Error ? emailError.message : 'Unable to send email code.'); }
+    finally { setEmailBusy(false); }
+  };
+
+  const verifyEmailCode = async () => {
+    setEmailBusy(true); setError('');
+    try { await draftRequest({ action: 'email-verify', draftId, resumeId, code: emailOtp }); setEmailVerified(true); setEmailOtp(''); }
+    catch (emailError) { setError(emailError instanceof Error ? emailError.message : 'Unable to verify email code.'); }
+    finally { setEmailBusy(false); }
+  };
+
+  const copyResumeId = async () => { try { await navigator.clipboard.writeText(resumeId); setCopiedResume(true); window.setTimeout(() => setCopiedResume(false), 1800); } catch { setError(`Copy your resume ID manually: ${resumeId}`); } };
 
   const startVerification = async () => {
     if (!clean(form.phone)) {
@@ -200,6 +270,7 @@ export default function SellerApplyPage() {
 
       setVerificationStatus('verified');
       setOtp('');
+      await createDraft();
     } catch (verifyError) {
       setError(
         verifyError instanceof Error
@@ -215,8 +286,6 @@ export default function SellerApplyPage() {
     const required: Array<[string, string]> = [
       ['Full Name', form.fullName],
       ['Business Name', form.businessName],
-      ['Business Email', form.businessEmail],
-      ['Personal Email', form.personalEmail],
       ['WhatsApp Phone', form.phone],
       ['Country', form.country],
       ['Street Address', form.address],
@@ -233,14 +302,16 @@ export default function SellerApplyPage() {
       if (!clean(value)) return `${label} is required.`;
     }
 
-    if (!validEmail(form.businessEmail)) return 'Please enter a valid business email address.';
-    if (!validEmail(form.personalEmail)) return 'Please enter a valid personal email address.';
     if (!form.preferredContact) return 'Please select your preferred contact email.';
+    if (!validEmail(selectedEmail)) return 'Please enter and verify the selected contact email.';
+    if (clean(form.businessEmail) && !validEmail(form.businessEmail)) return 'Please correct or remove the business email address.';
+    if (clean(form.personalEmail) && !validEmail(form.personalEmail)) return 'Please correct or remove the personal email address.';
     if (clean(form.businessInformation).length < 30) return 'Please provide more detail in Business Information.';
     if (clean(form.whyWorkWithAuronix).length < 20) return 'Please explain why you want to work with Auronix.';
     if (form.sellerPolicyAgreement !== true) return 'You must agree to the Auronix Seller Policy.';
     if (!form.contactAgreement) return 'Please agree to be contacted by Auronix Commerce LLC.';
     if (verificationStatus !== 'verified' || !verificationId) return 'Verify your WhatsApp number before submitting.';
+    if (!emailVerified || !draftId || !resumeId) return 'Verify your selected email before submitting.';
 
     if (clean(form.yearsInBusiness)) {
       const years = Number(clean(form.yearsInBusiness));
@@ -269,12 +340,13 @@ export default function SellerApplyPage() {
       const response = await fetch('/api/seller/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ form, verificationId }),
+        body: JSON.stringify({ form, verificationId, draftId, resumeId }),
       });
 
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Unable to submit your application.');
 
+      setSubmittedId(String(data.applicationId || ''));
       setSubmitted(true);
       setForm(INITIAL_FORM);
     } catch (submitError) {
@@ -301,6 +373,7 @@ export default function SellerApplyPage() {
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-foreground-muted">
               Your WhatsApp-verified seller application has been received successfully and will now go through the Auronix screening process.
             </p>
+            {submittedId && <div className="mx-auto mt-5 max-w-sm rounded-2xl border border-border bg-background p-4"><div className="text-xs uppercase tracking-wider text-foreground-muted">Application ID</div><div className="mt-1 break-all font-mono text-sm font-semibold">{submittedId}</div></div>}
             <Link href="/" className="mt-8 inline-flex rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground">
               Return to Auronix
             </Link>
@@ -321,30 +394,20 @@ export default function SellerApplyPage() {
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">SELLER PARTNERSHIPS</div>
           <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">Apply to work with Auronix.</h1>
           <p className="mt-5 text-base leading-7 text-foreground-muted sm:text-lg">
-            Tell us about your business, verify your WhatsApp number, and submit your seller application.
+            Complete five secure steps. Every completed step is saved so you can return with your private resume ID.
           </p>
         </div>
 
         <form onSubmit={submitApplication} className="mx-auto mt-12 max-w-4xl space-y-6">
-          <Section eyebrow="01" title="Contact Information" description="Provide your business and personal contact information.">
-            <div className="grid gap-5 md:grid-cols-2">
-              <Field label="Full Name" required value={form.fullName} onChange={value => updateField('fullName', value)} placeholder="John Smith" />
-              <Field label="Business Email" required type="email" value={form.businessEmail} onChange={value => updateField('businessEmail', value)} placeholder="john@company.com" />
-              <Field label="Personal Email" required type="email" value={form.personalEmail} onChange={value => updateField('personalEmail', value)} placeholder="johnsmith@gmail.com" />
-              <Field label="WhatsApp Phone" required value={form.phone} onChange={value => updateField('phone', value)} placeholder="+1 555 000 0000" />
-              <Field label="Country" required value={form.country} onChange={value => updateField('country', value)} placeholder="United States" />
-            </div>
+          <div className="rounded-3xl border border-border bg-card p-5 sm:p-6">
+            <div className="grid grid-cols-5 gap-2">{['WhatsApp','Email','Business','Profile','Review'].map((label, index) => <div key={label} className="text-center"><div className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step >= index + 1 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground-muted'}`}>{index + 1}</div><div className="mt-2 hidden text-[10px] font-medium sm:block">{label}</div></div>)}</div>
+            {!draftId && <button type="button" onClick={() => setResumeOpen(value => !value)} className="mx-auto mt-5 block text-sm font-semibold text-accent hover:underline">Resume a saved application</button>}
+            {resumeOpen && !draftId && <div className="mx-auto mt-4 flex max-w-md flex-col gap-2 sm:flex-row"><input value={resumeInput} onChange={event => setResumeInput(event.target.value.toUpperCase())} placeholder="AX-XXXXXXXX" className="h-11 flex-1 rounded-xl border border-border bg-background px-4 font-mono text-sm" /><button type="button" onClick={resumeApplication} disabled={savingDraft || !resumeInput.trim()} className="rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50">Resume</button></div>}
+            {resumeId && <div className="mt-5 flex flex-col items-center justify-between gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-4 sm:flex-row"><div><div className="text-xs font-semibold uppercase tracking-wider text-accent">Private resume ID</div><div className="mt-1 font-mono text-sm font-bold">{resumeId}</div></div><button type="button" onClick={copyResumeId} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-semibold"><Copy className="h-4 w-4" />{copiedResume ? 'Copied' : 'Copy ID'}</button></div>}
+          </div>
 
-            <div className="mt-6 rounded-2xl border border-border bg-secondary/30 p-5">
-              <h3 className="text-sm font-semibold">Preferred Email for Auronix Communication <span className="text-red-500">*</span></h3>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <RadioCard selected={form.preferredContact === 'business'} title="Business Email" description={form.businessEmail || 'Enter your business email above'} onSelect={() => updateField('preferredContact', 'business')} />
-                <RadioCard selected={form.preferredContact === 'personal'} title="Personal Email" description={form.personalEmail || 'Enter your personal email above'} onSelect={() => updateField('preferredContact', 'personal')} />
-              </div>
-            </div>
-          </Section>
-
-          <Section eyebrow="02" title="Verify WhatsApp Number" description="Verify that you control the WhatsApp number entered above before submitting your seller application.">
+          {step === 1 && <Section eyebrow="01" title="Verify WhatsApp Number" description="Enter your number with country code, then verify it through Auronix WhatsApp.">
+            <div className="mb-5 max-w-md"><Field label="WhatsApp Phone" required value={form.phone} onChange={value => updateField('phone', value)} placeholder="+1 555 000 0000" /></div>
             {verificationStatus === 'verified' ? (
               <div className="rounded-2xl border border-green-500/30 bg-green-500/5 p-5">
                 <div className="flex items-center gap-3">
@@ -473,9 +536,20 @@ export default function SellerApplyPage() {
                 )}
               </div>
             )}
-          </Section>
+          </Section>}
 
-          <Section eyebrow="03" title="Business Information" description="Tell us about your company and business activity.">
+          {step === 2 && <Section eyebrow="02" title="Verify Your Email" description="Choose a personal or business email. We will send a secure six-digit code and your resume ID.">
+            <div className="grid gap-5 md:grid-cols-2">
+              <Field label="Full Name" required value={form.fullName} onChange={value => updateField('fullName', value)} placeholder="John Smith" />
+              <Field label="Business Email" type="email" value={form.businessEmail} onChange={value => updateField('businessEmail', value)} placeholder="john@company.com" />
+              <Field label="Personal Email" type="email" value={form.personalEmail} onChange={value => updateField('personalEmail', value)} placeholder="johnsmith@gmail.com" />
+            </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2"><RadioCard selected={form.preferredContact === 'business'} title="Verify business email" description={form.businessEmail || 'Enter business email above'} onSelect={() => updateField('preferredContact', 'business')} /><RadioCard selected={form.preferredContact === 'personal'} title="Verify personal email" description={form.personalEmail || 'Enter personal email above'} onSelect={() => updateField('preferredContact', 'personal')} /></div>
+            {emailVerified ? <div className="mt-5 flex items-center gap-3 rounded-2xl border border-green-500/30 bg-green-500/5 p-5"><CheckCircle2 className="h-6 w-6 text-green-600" /><div><div className="font-semibold text-green-700">Email verified</div><div className="text-sm text-foreground-muted">Your resume ID was also sent to {selectedEmail}.</div></div></div> : <div className="mt-5 rounded-2xl border border-border bg-secondary/30 p-5"><button type="button" onClick={requestEmailCode} disabled={emailBusy || !form.preferredContact || !validEmail(selectedEmail)} className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{emailBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}{emailCodeSent ? 'Send New Code' : 'Send Email Code'}</button>{emailCodeSent && <div className="mt-4 flex flex-col gap-3 sm:flex-row"><input value={emailOtp} onChange={event => setEmailOtp(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="000000" className="h-12 flex-1 rounded-xl border border-border bg-background px-4 text-center text-xl font-bold tracking-[0.35em]" /><button type="button" onClick={verifyEmailCode} disabled={emailBusy || emailOtp.length !== 6} className="rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground disabled:opacity-50">Verify Email</button></div>}</div>}
+            <div className="mt-6 flex justify-end"><button type="button" onClick={() => saveStep(3)} disabled={!emailVerified || savingDraft || !clean(form.fullName)} className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">Continue <ArrowRight className="h-4 w-4" /></button></div>
+          </Section>}
+
+          {step === 3 && <Section eyebrow="03" title="Business Information" description="Tell us about your company and business activity.">
             <div className="grid gap-5 md:grid-cols-2">
               <Field label="Business Name" required value={form.businessName} onChange={value => updateField('businessName', value)} placeholder="Your Business LLC" />
               <SelectField label="Business Type" required value={form.businessType} onChange={value => updateField('businessType', value)} options={BUSINESS_TYPES} />
@@ -485,18 +559,20 @@ export default function SellerApplyPage() {
             <div className="mt-5">
               <Field label="Product Categories" required value={form.productCategories} onChange={value => updateField('productCategories', value)} placeholder="Home & Kitchen, Electronics, Office Products" />
             </div>
-          </Section>
+            <div className="mt-6 flex justify-between"><button type="button" onClick={() => setStep(2)} className="inline-flex items-center gap-2 px-3 text-sm font-semibold"><ArrowLeft className="h-4 w-4" />Back</button><button type="button" onClick={() => saveStep(4)} disabled={savingDraft || !clean(form.businessName) || !clean(form.businessType) || !clean(form.productCategories)} className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">Save & Continue <ArrowRight className="h-4 w-4" /></button></div>
+          </Section>}
 
-          <Section eyebrow="04" title="Business Address" description="Provide the primary business address.">
+          {step === 4 && <><Section eyebrow="04" title="Business Address & Profile" description="Provide the primary business address and information used for review.">
+            <Field label="Country" required value={form.country} onChange={value => updateField('country', value)} placeholder="United States" />
+            <div className="mt-5">
             <Field label="Street Address" required value={form.address} onChange={value => updateField('address', value)} placeholder="123 Market Street, Suite 200" />
+            </div>
             <div className="mt-5 grid gap-5 md:grid-cols-3">
               <Field label="City" required value={form.city} onChange={value => updateField('city', value)} placeholder="Miami" />
               <Field label="State / Province" required value={form.state} onChange={value => updateField('state', value)} placeholder="Florida" />
               <Field label="ZIP / Postal Code" required value={form.zipCode} onChange={value => updateField('zipCode', value)} placeholder="33101" />
             </div>
-          </Section>
 
-          <Section eyebrow="05" title="Products & Business Profile" description="Give us enough information to understand your business.">
             <TextAreaField label="Business Information" required value={form.businessInformation} onChange={value => updateField('businessInformation', value)} rows={8} placeholder="Tell us about your business, products, customers, sourcing, distribution, operations, and commercial capabilities." />
             <div className="mt-5">
               <TextAreaField label="Why do you want to work with Auronix?" required value={form.whyWorkWithAuronix} onChange={value => updateField('whyWorkWithAuronix', value)} rows={6} placeholder="Explain what type of partnership you are seeking with Auronix Commerce LLC." />
@@ -504,9 +580,10 @@ export default function SellerApplyPage() {
             <div className="mt-5">
               <Field label="Catalog URL" type="url" value={form.catalogUrl} onChange={value => updateField('catalogUrl', value)} placeholder="https://example.com/catalog" />
             </div>
-          </Section>
+            <div className="mt-6 flex justify-between"><button type="button" onClick={() => setStep(3)} className="inline-flex items-center gap-2 px-3 text-sm font-semibold"><ArrowLeft className="h-4 w-4" />Back</button><button type="button" onClick={() => saveStep(5)} disabled={savingDraft || !clean(form.country) || !clean(form.address) || !clean(form.city) || !clean(form.state) || !clean(form.zipCode) || clean(form.businessInformation).length < 30 || clean(form.whyWorkWithAuronix).length < 20} className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">Save & Review <ArrowRight className="h-4 w-4" /></button></div>
+          </Section></>}
 
-          <Section eyebrow="06" title="Seller Policy & Agreements" description="Review and accept the Auronix Seller Policy before submitting.">
+          {step === 5 && <Section eyebrow="05" title="Review & Agreements" description="Review the seller policy, accept the agreements, and submit your verified application.">
             <div className="rounded-2xl border border-border bg-secondary/30 p-5">
               <div className="flex items-start gap-4">
                 <ShieldCheck className="mt-0.5 h-5 w-5 text-accent" />
@@ -529,22 +606,23 @@ export default function SellerApplyPage() {
               <input type="checkbox" checked={form.contactAgreement} onChange={event => updateField('contactAgreement', event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
               <span className="text-sm leading-6 text-foreground-muted">I agree to be contacted by Auronix Commerce LLC regarding my seller application. <span className="text-red-500">*</span></span>
             </label>
-          </Section>
+          </Section>}
 
           {error && (
             <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm leading-6 text-red-700">{error}</div>
           )}
 
-          <div className="flex flex-col items-center gap-4 pt-2">
+          {step === 5 && <div className="flex flex-col items-center gap-4 pt-2">
             <button
               type="submit"
               disabled={submitting || verificationStatus !== 'verified'}
               className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-7 py-4 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:min-w-[240px]"
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              {submitting ? 'Submitting...' : verificationStatus === 'verified' ? 'Submit Application' : 'Verify WhatsApp to Submit'}
+              {submitting ? 'Submitting...' : 'Submit Verified Application'}
             </button>
-          </div>
+            <button type="button" onClick={() => setStep(4)} className="inline-flex items-center gap-2 text-sm font-semibold"><ArrowLeft className="h-4 w-4" />Back to profile</button>
+          </div>}
         </form>
       </div>
     </main>

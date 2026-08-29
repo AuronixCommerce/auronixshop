@@ -56,6 +56,18 @@ export async function sendPasswordResetEmail(input: { email: string; name?: stri
   return sendNotificationMail({ to: input.email, subject: 'Reset your Auronix Commerce password', html, text: `Hello ${input.name || 'there'},\n\nReset your password using this secure link:\n${url}\n\nIf you did not request this, ignore this email. Contact ${SUPPORT_EMAIL} if you need help.` });
 }
 
+export async function sendSellerEmailVerification(input: { email: string; code: string; expiresAt: number }) {
+  const expiry = new Date(input.expiresAt).toLocaleTimeString('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
+  const html = emailShell({ preheader: `${input.code} is your seller application verification code.`, title: 'Verify your seller application email', footerNote: 'Never share this verification code. Auronix representatives will not ask you for it.', body: `<h1 style="margin:0 0 16px;font-size:27px;line-height:1.2">Verify your email</h1><p>Enter this six-digit code in the Auronix seller application:</p><div style="margin:24px 0;padding:18px;border-radius:14px;background:#f3f4f6;text-align:center;font-size:32px;font-weight:800;letter-spacing:.22em">${escapeHtml(input.code)}</div><p>The code expires at <strong>${escapeHtml(expiry)} UTC</strong>.</p>` });
+  return sendNotificationMail({ to: input.email, subject: `${input.code} — Verify your Auronix seller application`, html, text: `Your Auronix seller application verification code is ${input.code}. It expires at ${expiry} UTC. Never share this code.` });
+}
+
+export async function sendSellerResumeIdEmail(input: { email: string; resumeId: string }) {
+  const url = `${SITE_URL}/seller/apply`;
+  const html = emailShell({ preheader: 'Your seller application progress has been saved.', title: 'Resume your seller application', footerNote: 'Keep your resume ID private. It provides access to your unfinished application.', body: `<h1 style="margin:0 0 16px;font-size:27px;line-height:1.2">Your progress is saved</h1><p>Use the private resume ID below to continue your Auronix seller application:</p><div style="margin:24px 0;padding:18px;border-radius:14px;background:#f3f4f6;text-align:center;font-size:23px;font-weight:800;letter-spacing:.08em">${escapeHtml(input.resumeId)}</div>${cta('Resume application', url)}<p style="color:#6b7280;font-size:13px">If you did not start this application, contact support.</p>` });
+  return sendNotificationMail({ to: input.email, subject: 'Resume your Auronix seller application', html, text: `Your seller application progress is saved. Resume at ${url} using private resume ID: ${input.resumeId}.` });
+}
+
 export async function sendTicketResponseEmail(input: any, positionalSubject?: string, positionalMessage?: string) {
   if (typeof input === 'string') input = { email: input, subject: positionalSubject, message: positionalMessage };
   const message = String(input.message || input.response || input.body || input.text || '');

@@ -30,6 +30,7 @@ const PLATFORM_RELEASE: Release = {
   summary: 'A production-focused release improving seller access, live account visibility, supplier onboarding, legal content, appearance, and transactional account flows.',
   releaseDate: Date.UTC(2026, 7, 29),
   features: [
+    'Five-step seller application with WhatsApp verification, selected-email OTP, automatic progress saving, and private resume IDs.',
     'Live seller verification center for account, email, WhatsApp, and business-profile status.',
     'Dedicated seller access chooser with separate login and new-account application paths.',
     'Persistent light and dark appearance across public, authentication, seller, and admin experiences.',
@@ -37,6 +38,7 @@ const PLATFORM_RELEASE: Release = {
     'Supplier application experience with structured validation and database persistence.',
   ],
   fixes: [
+    'Stopping an AI answer now preserves only the response text that was visible when Stop was pressed.',
     'Seller approval invitations and password reset links now use secure, reliable token handling.',
     'Cookie Policy links now resolve correctly, including compatibility for older /cookies links.',
     'Legal-page bold text, italics, links, and lists now render instead of appearing as raw symbols.',
