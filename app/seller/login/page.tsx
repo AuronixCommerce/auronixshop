@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { AuronixMark } from '@/components/site/auronix-mark';
 import { useRouter } from 'next/navigation';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
@@ -139,11 +140,7 @@ export default function SellerLoginPage() {
             href="/"
             className="inline-flex items-center gap-2 mb-6"
           >
-            <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-base">
-                A
-              </span>
-            </div>
+            <AuronixMark />
 
             <div className="flex flex-col leading-none text-left">
               <span className="text-sm font-semibold tracking-tight">

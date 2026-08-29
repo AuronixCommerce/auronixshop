@@ -177,7 +177,7 @@ export const SITE_PAGES: SitePageDefinition[] = [
   },
   {
     id: 'cookies',
-    path: '/cookies',
+    path: '/cookie-policy',
     title: 'Cookie Policy',
     category: 'Legal',
     section: 'legal',

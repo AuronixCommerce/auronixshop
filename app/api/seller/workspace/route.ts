@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     ]);
     const data = dataSnapshot.val() || {};
     return NextResponse.json({
+      serverTime: Date.now(),
       profile,
       application: applicationSnapshot?.exists() ? applicationSnapshot.val() : null,
       products: list(data.products),

@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import type { UserProfile } from '@/lib/types';
+import { AuronixMark } from '@/components/site/auronix-mark';
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
@@ -135,11 +136,7 @@ export default function AdminLoginPage() {
             href="/"
             className="inline-flex items-center gap-2 mb-6"
           >
-            <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-base">
-                A
-              </span>
-            </div>
+            <AuronixMark />
 
             <div className="flex flex-col leading-none">
               <span className="text-sm font-semibold tracking-tight">

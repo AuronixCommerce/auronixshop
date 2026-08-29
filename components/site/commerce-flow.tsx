@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { AuronixMark } from '@/components/site/auronix-mark';
 
 const NODES = [
   { label: 'Suppliers', y: 0 },
@@ -53,7 +54,7 @@ export function CommerceFlow() {
                 }`}
               >
                 {node.highlight ? (
-                  <span className="font-bold text-lg tracking-tight">A</span>
+                  <AuronixMark className="h-8 w-8 shadow-none" />
                 ) : (
                   <span className="text-[10px] font-mono text-foreground-muted">
                     {String(i + 1).padStart(2, '0')}

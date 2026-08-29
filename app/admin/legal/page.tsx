@@ -5,6 +5,7 @@ import { ref, onValue, update } from 'firebase/database';
 import { db } from '@/lib/firebase';
 import { AdminLayout } from '@/components/admin/admin-layout';
 import { Save, Loader2 } from 'lucide-react';
+import { LegalRichText } from '@/components/site/legal-rich-text';
 
 const LEGAL_KEYS = [
   { key: 'privacy', label: 'Privacy Policy' },
@@ -12,6 +13,20 @@ const LEGAL_KEYS = [
   { key: 'disclaimer', label: 'Disclaimer' },
   { key: 'cookie-policy', label: 'Cookie Policy' },
 ];
+
+function parseSections(body: string) {
+  return body
+    .split(/\n(?=## )/g)
+    .map((section) => section.trim())
+    .filter(Boolean)
+    .map((section) => {
+      const lines = section.split('\n');
+      return {
+        heading: lines[0].replace(/^##\s*/, '').trim() || 'Section',
+        body: lines.slice(1).join('\n').trim(),
+      };
+    });
+}
 
 export default function LegalAdminPage() {
   const [selected, setSelected] = useState('privacy');
@@ -46,20 +61,7 @@ export default function LegalAdminPage() {
 
     setSaving(true);
 
-    const sections = body
-      .split(/\n(?=## )/g)
-      .map((section) => section.trim())
-      .filter(Boolean)
-      .map((section) => {
-        const lines = section.split('\n');
-        const heading = lines[0].replace(/^##\s*/, '').trim();
-        const sectionBody = lines.slice(1).join('\n').trim();
-
-        return {
-          heading: heading || 'Section',
-          body: sectionBody,
-        };
-      });
+    const sections = parseSections(body);
 
     try {
       await update(ref(db, `legal/${selected}`), {
@@ -125,7 +127,7 @@ export default function LegalAdminPage() {
                   Content
                 </label>
                 <p className="text-xs text-foreground-muted mb-2">
-                  Use headings like <code>## Heading</code> on separate lines.
+                  Use <code>## Heading</code>, <code>**bold**</code>, <code>*italic*</code>, <code>[link text](https://...)</code>, and lines beginning with <code>-</code> for lists. Raw HTML is not accepted.
                 </p>
                 <textarea
                   value={body}
@@ -150,6 +152,26 @@ export default function LegalAdminPage() {
             </>
           )}
         </div>
+
+        {!loading && body.trim() && (
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="font-semibold">Live public preview</h2>
+                <p className="mt-1 text-xs text-foreground-muted">Bold, italic, links, and lists render exactly as they will on the public legal page.</p>
+              </div>
+              <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium">{parseSections(body).length} sections</span>
+            </div>
+            <div className="space-y-8 rounded-xl border border-border bg-background p-5">
+              {parseSections(body).map((section, index) => (
+                <section key={`${section.heading}-${index}`}>
+                  <h3 className="mb-3 text-lg font-semibold tracking-tight">{section.heading}</h3>
+                  <LegalRichText value={section.body} />
+                </section>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </AdminLayout>
   );

@@ -4,6 +4,7 @@ import { FormEvent, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import { AuronixMark } from '@/components/site/auronix-mark';
 
 export default function SellerActivatePage() {
   const searchParams = useSearchParams();
@@ -82,11 +83,7 @@ export default function SellerActivatePage() {
 
         <div className="text-center mb-7">
           <div className="inline-flex items-center gap-2">
-            <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold">
-                A
-              </span>
-            </div>
+            <AuronixMark />
 
             <div className="text-left">
               <div className="text-sm font-semibold">

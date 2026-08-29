@@ -8,6 +8,7 @@ import { getData } from '@/lib/firebase-db';
 import { onAuthChange, signOut } from '@/lib/auth';
 import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { AuronixMark } from '@/components/site/auronix-mark';
 import { LayoutDashboard, User, Package, FileText, LifeBuoy, Settings, LogOut, Loader2 } from 'lucide-react';
 
 const NAV = [
@@ -66,9 +67,7 @@ export function SellerLayout({ children }: { children: ReactNode }) {
       <aside className="hidden lg:flex w-64 flex-col border-r border-border bg-card fixed inset-y-0 left-0 z-40">
         <div className="px-6 py-5 border-b border-border">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">A</span>
-            </div>
+            <AuronixMark className="h-7 w-7 shadow-none" />
             <div className="flex flex-col leading-none">
               <span className="text-[13px] font-semibold tracking-tight">AURONIX</span>
               <span className="text-[9px] font-medium tracking-[0.15em] text-foreground-muted uppercase">Seller Portal</span>
@@ -110,9 +109,7 @@ export function SellerLayout({ children }: { children: ReactNode }) {
       {/* Mobile header */}
       <div className="lg:hidden fixed top-0 inset-x-0 z-40 bg-card border-b border-border px-5 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">A</span>
-          </div>
+          <AuronixMark className="h-7 w-7 shadow-none" />
           <span className="text-[13px] font-semibold tracking-tight">AURONIX</span>
         </Link>
         <button onClick={handleSignOut} className="text-foreground-muted hover:text-foreground">

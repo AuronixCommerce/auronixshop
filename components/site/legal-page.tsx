@@ -9,6 +9,7 @@ import { LoadingState, ErrorState, EmptyState } from '@/components/site/states';
 import { getData } from '@/lib/firebase-db';
 import type { LegalContent } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { LegalRichText } from '@/components/site/legal-rich-text';
 
 interface LegalPageProps {
   slug: 'privacy' | 'terms' | 'disclaimer' | 'cookie-policy';
@@ -94,7 +95,7 @@ export function LegalPage({ slug, title, eyebrow, description }: LegalPageProps)
                   {sections.map((section, i) => (
                     <div key={i} id={`section-${i}`} className="scroll-mt-24">
                       <h2 className="text-xl font-semibold tracking-tight mb-4">{section.heading}</h2>
-                      <p className="text-base text-foreground-muted leading-relaxed whitespace-pre-line">{section.body}</p>
+                      <LegalRichText value={section.body} />
                     </div>
                   ))}
                 </div>

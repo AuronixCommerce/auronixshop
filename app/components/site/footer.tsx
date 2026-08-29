@@ -149,7 +149,7 @@ export default function Footer() {
               </Link>
 
               <Link
-                href="/cookies"
+                href="/cookie-policy"
                 className="block hover:text-foreground"
               >
                 Cookie Policy

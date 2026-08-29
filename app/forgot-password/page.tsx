@@ -3,6 +3,7 @@
 import { FormEvent, useState } from 'react';
 import { Loader2, MailCheck, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { AuronixMark } from '@/components/site/auronix-mark';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -68,11 +69,7 @@ export default function ForgotPasswordPage() {
             href="/seller/login"
             className="inline-flex items-center gap-2"
           >
-            <div className="w-9 h-9 rounded-md bg-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold">
-                A
-              </span>
-            </div>
+            <AuronixMark />
 
             <div className="text-left">
               <div className="text-sm font-semibold tracking-tight">

@@ -6,6 +6,7 @@ import {
 } from 'react';
 
 import Link from 'next/link';
+import { AuronixMark } from '@/components/site/auronix-mark';
 
 import {
   CheckCircle2,
@@ -182,9 +183,7 @@ export function Footer() {
               href="/"
               className="inline-flex items-center gap-2"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">
-                A
-              </span>
+              <AuronixMark />
 
               <span className="font-semibold tracking-tight">
                 Auronix Commerce LLC
@@ -314,7 +313,7 @@ export function Footer() {
               </Link>
 
               <Link
-                href="/cookies"
+                href="/cookie-policy"
                 className="block hover:text-foreground"
               >
                 Cookie Policy
