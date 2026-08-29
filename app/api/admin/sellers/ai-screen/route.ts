@@ -4,6 +4,7 @@ import { requireAdmin } from '@/lib/server-auth';
 import { adminDb } from '@/lib/firebase-admin';
 import { generateGroqResponse } from '@/lib/server-groq';
 import { sendSellerInvitationEmail } from '@/lib/server-mail';
+import { issueSellerInvitation } from '@/lib/server-seller-invitations';
 
 type ScreeningLabel =
   | 'AI_APPROVED'
@@ -1169,22 +1170,6 @@ Perform an independent review.
   };
 }
 
-function invitationUrl(
-  applicationId: string
-): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.AURONIX_WEBSITE ||
-    'https://auronixcommerce.com';
-
-  return `${base.replace(
-    /\/$/,
-    ''
-  )}/seller/activate?applicationId=${encodeURIComponent(
-    applicationId
-  )}`;
-}
-
 async function approveAndSendInvitation(
   applicationId: string,
   app: SellerApplication,
@@ -1252,10 +1237,7 @@ async function approveAndSendInvitation(
     app.preferredContactType ||
     'business';
 
-  const url =
-    invitationUrl(
-      applicationId
-    );
+  const { invitationUrl: url, expiresAt } = await issueSellerInvitation(applicationId);
 
   /*
    * Save approval before sending email so
@@ -1321,6 +1303,7 @@ async function approveAndSendInvitation(
         app.fullName,
 invitationUrl:
         url,
+      expiresAt,
     });
 
     await applicationRef.update({

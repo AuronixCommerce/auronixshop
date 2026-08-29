@@ -19,7 +19,7 @@ export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const oobCode = searchParams.get('oobCode') || '';
+  const oobCode = searchParams.get('oobCode') || searchParams.get('code') || '';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -198,10 +198,10 @@ export default function ResetPasswordPage() {
               </p>
 
               <Link
-                href="/seller/login"
+                href="/forgot-password"
                 className="inline-flex mt-6 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-sm font-medium"
               >
-                Back to Seller Login
+                Request a new reset link
               </Link>
             </div>
           ) : (

@@ -22,12 +22,12 @@ const SMTP_PASSWORD =
   '';
 
 const SUPPORT_EMAIL =
-  process.env.SUPPORT_EMAIL ||
+  process.env.MAIL_REPLY_TO || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || process.env.SUPPORT_EMAIL ||
   SMTP_USER ||
   '';
 
 const WEBSITE =
-  process.env.AURONIX_WEBSITE ||
+  process.env.NEXT_PUBLIC_SITE_URL || process.env.AURONIX_WEBSITE ||
   'https://auronixcommerce.com';
 
 function requireMailConfig() {
@@ -472,7 +472,7 @@ export async function sendNewsletterEmail(
 
   await transport.sendMail({
     from:
-      `"Auronix Commerce LLC" <${SMTP_USER}>`,
+      `"Auronix Commerce LLC" <${process.env.MAIL_NOTIFICATION_FROM || 'notifications@auronixcommerce.com'}>`,
 
     to:
       subscriber.email,

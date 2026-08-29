@@ -1,15 +1,16 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function SellerActivatePage() {
   const searchParams = useSearchParams();
+  const params = useParams();
   const router = useRouter();
 
-  const token = searchParams.get('token') || '';
+  const token = String(params?.token || searchParams.get('token') || '');
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');

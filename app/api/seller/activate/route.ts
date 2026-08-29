@@ -1,183 +1,58 @@
-﻿import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { hashInvitationToken, normalizeEmail } from '@/lib/server-seller-invitations';
 
-function hashToken(token: string) {
-  return createHash('sha256')
-    .update(token.trim())
-    .digest('hex');
-}
+const response = (error: string, code: string, status: number) => NextResponse.json({ error, code }, { status });
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-
-    const rawToken = String(body.token || '');
-    const token = decodeURIComponent(rawToken).trim();
+    const token = String(body.token || '').trim();
     const password = String(body.password || '');
+    if (!token) return response('Invitation token is missing.', 'TOKEN_MISSING', 400);
+    if (password.length < 8) return response('Password must be at least 8 characters.', 'PASSWORD_TOO_SHORT', 400);
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Invitation token is missing.' },
-        { status: 400 }
-      );
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: 'Password must be at least 8 characters.' },
-        { status: 400 }
-      );
-    }
-
-    const tokenHash = hashToken(token);
-
-    const snapshot = await adminDb
-      .ref('sellerApplications')
-      .get();
-
-    if (!snapshot.exists()) {
-      return NextResponse.json(
-        { error: 'No seller applications found.' },
-        { status: 404 }
-      );
-    }
-
-    const applications = snapshot.val();
-
-    let applicationId: string | null = null;
-    let application: any = null;
-
-    for (const [id, value] of Object.entries(applications)) {
-      const candidate = value as any;
-
-      if (
-        candidate?.invitationTokenHash &&
-        String(candidate.invitationTokenHash) === tokenHash
-      ) {
-        applicationId = id;
-        application = candidate;
-        break;
-      }
-    }
-
-    if (!applicationId || !application) {
-      return NextResponse.json(
-        {
-          error:
-            'Invalid invitation. Please use the newest invitation email.',
-        },
-        { status: 400 }
-      );
-    }
-
+    const tokenHash = hashInvitationToken(token);
+    const snapshot = await adminDb.ref('sellerApplications').orderByChild('invitationTokenHash').equalTo(tokenHash).limitToFirst(1).get();
+    if (!snapshot.exists()) return response('This invitation is invalid. Use the newest invitation email or ask support to resend it.', 'INVITATION_INVALID', 404);
+    const matches = snapshot.val() as Record<string, any>;
+    const applicationId = Object.keys(matches)[0];
+    const application = matches[applicationId];
     const expires = Number(application.invitationExpires || 0);
+    if (!expires || Date.now() >= expires) return response('This invitation has expired. Ask Auronix to send a new invitation.', 'INVITATION_EXPIRED', 410);
+    if (application.invitationUsedAt) return response('This invitation has already been used. Sign in or reset your password.', 'INVITATION_USED', 409);
+    if (!['approved', 'invited'].includes(String(application.status))) return response('This application is not eligible for activation.', 'APPLICATION_NOT_ELIGIBLE', 409);
 
-    if (!expires) {
-      return NextResponse.json(
-        { error: 'This invitation has no valid expiration.' },
-        { status: 400 }
-      );
-    }
-
-    if (Date.now() >= expires) {
-      return NextResponse.json(
-        {
-          error:
-            'This invitation has expired. Please ask Auronix to send a new invitation.',
-        },
-        { status: 400 }
-      );
-    }
-
-    if (application.invitationUsedAt) {
-      return NextResponse.json(
-        { error: 'This invitation has already been used.' },
-        { status: 400 }
-      );
-    }
-
-    if (
-      application.status !== 'approved' &&
-      application.status !== 'invited'
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            'This seller application is not currently eligible for activation.',
-        },
-        { status: 400 }
-      );
-    }
-
-    // Make sure a Firebase Auth account doesn't already exist.
+    const accountEmail = normalizeEmail(application.preferredContactEmail || application.businessEmail || application.email || application.personalEmail);
+    if (!accountEmail) return response('This invitation has no valid account email. Contact support.', 'INVITATION_EMAIL_MISSING', 422);
     try {
-      await adminAuth.getUserByEmail(application.email);
-
-      return NextResponse.json(
-        {
-          error:
-            'An account already exists for this email. Please use Seller Login.',
-        },
-        { status: 409 }
-      );
+      await adminAuth.getUserByEmail(accountEmail);
+      return response('An account already exists for this email. Sign in or reset your password.', 'ACCOUNT_EXISTS', 409);
     } catch (error: any) {
-      if (error?.code !== 'auth/user-not-found') {
-        throw error;
-      }
+      if (error?.code !== 'auth/user-not-found') throw error;
     }
 
-    const user = await adminAuth.createUser({
-      email: application.email,
-      password,
-      displayName: application.fullName,
-      emailVerified: false,
-    });
-
-    await adminAuth.setCustomUserClaims(user.uid, {
-      role: 'seller',
-    });
-
-    const now = Date.now();
-
-    await adminDb.ref(`users/${user.uid}`).set({
-      uid: user.uid,
-      email: application.email,
-      displayName: application.fullName,
-      name: application.fullName,
-      businessName: application.businessName || '',
-      sellerApplicationId: applicationId,
-      role: 'seller',
-      status: 'active',
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    await adminDb
-      .ref(`sellerApplications/${applicationId}`)
-      .update({
-        status: 'active',
-        invitationUsedAt: now,
-        invitationTokenHash: null,
-        invitationExpires: null,
-        updatedAt: now,
+    const user = await adminAuth.createUser({ email: accountEmail, password, displayName: application.fullName, emailVerified: false });
+    try {
+      await adminAuth.setCustomUserClaims(user.uid, { role: 'seller' });
+      const now = Date.now();
+      await adminDb.ref().update({
+        [`users/${user.uid}`]: { uid: user.uid, email: accountEmail, emailNormalized: accountEmail, displayName: application.fullName, name: application.fullName, businessName: application.businessName || '', sellerApplicationId: applicationId, role: 'seller', status: 'active', createdAt: now, updatedAt: now },
+        [`sellerApplications/${applicationId}/status`]: 'active',
+        [`sellerApplications/${applicationId}/accountCreated`]: true,
+        [`sellerApplications/${applicationId}/accountCreationStatus`]: 'active',
+        [`sellerApplications/${applicationId}/invitationUsedAt`]: now,
+        [`sellerApplications/${applicationId}/invitationTokenHash`]: null,
+        [`sellerApplications/${applicationId}/invitationExpires`]: null,
+        [`sellerApplications/${applicationId}/updatedAt`]: now,
       });
-
-    return NextResponse.json({
-      success: true,
-      uid: user.uid,
-    });
+    } catch (error) {
+      await adminAuth.deleteUser(user.uid).catch(() => undefined);
+      throw error;
+    }
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Seller activation failed:', error);
-
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : 'Unable to create seller account.',
-      },
-      { status: 500 }
-    );
+    console.error('Seller activation failed:', error instanceof Error ? error.message : 'Unknown error');
+    return response('Unable to create the seller account right now. Please retry or contact support.', 'ACTIVATION_FAILED', 500);
   }
 }

@@ -3,6 +3,7 @@
 import { requireAdmin } from '@/lib/server-auth';
 import { adminDb } from '@/lib/firebase-admin';
 import { sendSellerInvitationEmail } from '@/lib/server-mail';
+import { issueSellerInvitation, normalizeEmail } from '@/lib/server-seller-invitations';
 
 function text(
   value: unknown
@@ -106,7 +107,7 @@ function getPreferredEmail(
   if (
     explicit
   ) {
-    return explicit;
+    return normalizeEmail(explicit);
   }
 
   const type =
@@ -118,7 +119,7 @@ function getPreferredEmail(
     type ===
     'personal'
   ) {
-    return (
+    return normalizeEmail(
       getPersonalEmail(
         application
       ) ||
@@ -128,7 +129,7 @@ function getPreferredEmail(
     );
   }
 
-  return (
+  return normalizeEmail(
     getBusinessEmail(
       application
     ) ||
@@ -144,22 +145,6 @@ function isValidEmail(
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
     value
   );
-}
-
-function createInvitationUrl(
-  applicationId: string
-): string {
-  const base =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    process.env.AURONIX_WEBSITE ||
-    'https://auronixcommerce.com';
-
-  return `${base.replace(
-    /\/$/,
-    ''
-  )}/seller/activate?applicationId=${encodeURIComponent(
-    applicationId
-  )}`;
 }
 
 export async function POST(
@@ -309,13 +294,10 @@ export async function POST(
       });
     }
 
-    const invitationUrl =
-      createInvitationUrl(
-        applicationId
-      );
-
     const now =
       Date.now();
+
+    const { invitationUrl, expiresAt } = await issueSellerInvitation(applicationId);
 
     /*
      * Preserve both emails and record exactly
@@ -323,7 +305,7 @@ export async function POST(
      */
     await applicationRef.update({
       status:
-        'approved',
+        'invited',
 
       approvedAt:
         now,
@@ -363,6 +345,7 @@ export async function POST(
         name:
           fullName,
 invitationUrl,
+        expiresAt,
       });
 
       await applicationRef.update({

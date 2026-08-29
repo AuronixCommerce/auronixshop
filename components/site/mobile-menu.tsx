@@ -13,6 +13,7 @@ import {
 import { AnimatePresence, motion } from 'framer-motion';
 
 import { NAV_LINKS } from '@/lib/constants';
+import { ThemeToggle } from './theme-toggle';
 
 interface MobileMenuProps {
   open: boolean;
@@ -244,6 +245,7 @@ export function MobileMenu({
 
             {/* BOTTOM */}
             <div className="border-t border-border/60 p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+              <ThemeToggle className="mb-3 w-full rounded-2xl" showLabel />
               <Link
                 href="/contact"
                 onClick={onClose}

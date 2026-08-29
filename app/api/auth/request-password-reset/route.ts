@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
       if (user.email) {
         const baseUrl = (
-          process.env.APP_URL || 'http://localhost:3000'
+          process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'https://auronixcommerce.com'
         ).replace(/\/+$/, '');
 
         const resetLink =
@@ -33,11 +33,7 @@ export async function POST(request: Request) {
             }
           );
 
-        await sendPasswordResetEmail(
-          user.email,
-          user.displayName || '',
-          resetLink
-        );
+        await sendPasswordResetEmail({ email: user.email, name: user.displayName || '', resetUrl: resetLink });
       }
     } catch (error: any) {
       if (error?.code !== 'auth/user-not-found') {

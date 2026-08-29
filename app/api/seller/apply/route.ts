@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'crypto';
 
-import { adminDb } from '@/lib/firebase-admin';
+import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { normalizePhone } from '@/lib/seller-whatsapp';
+import { normalizeEmail } from '@/lib/server-seller-invitations';
 
 export const runtime = 'nodejs';
 
 const SELLER_POLICY_VERSION = '2026-08-15';
 const APPLICATION_VERSION = 'seller-application-v6-whatsapp';
+const ACTIVE_APPLICATION_STATUSES = new Set(['pending', 'screening', 'approved', 'invited', 'active']);
+const emailKey = (email: string) => createHash('sha256').update(email).digest('hex');
 
 function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
@@ -52,8 +56,8 @@ export async function POST(request: Request) {
       }
     }
 
-    const businessEmail = text(form.businessEmail);
-    const personalEmail = text(form.personalEmail);
+    const businessEmail = normalizeEmail(form.businessEmail);
+    const personalEmail = normalizeEmail(form.personalEmail);
     if (!validEmail(businessEmail) || !validEmail(personalEmail)) {
       return NextResponse.json({ success: false, error: 'Please enter valid email addresses.' }, { status: 400 });
     }
@@ -65,6 +69,26 @@ export async function POST(request: Request) {
     const preferredContact = text(form.preferredContact);
     if (preferredContact !== 'business' && preferredContact !== 'personal') {
       return NextResponse.json({ success: false, error: 'Select your preferred contact email.' }, { status: 400 });
+    }
+    const preferredContactEmail = preferredContact === 'personal' ? personalEmail : businessEmail;
+
+    for (const email of Array.from(new Set([businessEmail, personalEmail]))) {
+      try {
+        await adminAuth.getUserByEmail(email);
+        return NextResponse.json({ success: false, error: 'A seller account already exists for this email. Sign in or reset your password instead.', code: 'SELLER_ACCOUNT_EXISTS' }, { status: 409 });
+      } catch (accountError: any) {
+        if (accountError?.code !== 'auth/user-not-found') throw accountError;
+      }
+    }
+
+    const applicationsSnapshot = await adminDb.ref('sellerApplications').get();
+    if (applicationsSnapshot.exists()) {
+      for (const application of Object.values(applicationsSnapshot.val() as Record<string, any>)) {
+        const emails = [application.businessEmail, application.personalEmail, application.preferredContactEmail, application.email].map(normalizeEmail);
+        if (emails.some((email) => [businessEmail, personalEmail].includes(email)) && ACTIVE_APPLICATION_STATUSES.has(String(application.status || 'pending').toLowerCase())) {
+          return NextResponse.json({ success: false, error: 'An active seller application already exists for this email. Check your inbox or contact support for its status.', code: 'APPLICATION_ALREADY_EXISTS' }, { status: 409 });
+        }
+      }
     }
 
     const businessInformation = text(form.businessInformation);
@@ -106,9 +130,19 @@ export async function POST(request: Request) {
     const applicationId = applicationRef.key;
     if (!applicationId) throw new Error('Unable to create application ID.');
 
-    const timestamp = Date.now();
-    const preferredContactEmail = preferredContact === 'personal' ? personalEmail : businessEmail;
+    const emailIndexRef = adminDb.ref(`sellerApplicationEmailIndex/${emailKey(preferredContactEmail)}`);
+    const existingReservation = await emailIndexRef.get();
+    const reservedApplicationId = String(existingReservation.val()?.applicationId || '');
+    if (reservedApplicationId) {
+      const reservedStatus = await adminDb.ref(`sellerApplications/${reservedApplicationId}/status`).get();
+      if (!reservedStatus.exists() || !ACTIVE_APPLICATION_STATUSES.has(String(reservedStatus.val()).toLowerCase())) await emailIndexRef.remove();
+    }
+    const reservation = await emailIndexRef.transaction((current) => current || { applicationId, createdAt: Date.now() });
+    if (!reservation.committed || reservation.snapshot.val()?.applicationId !== applicationId) {
+      return NextResponse.json({ success: false, error: 'An active seller application already exists for this email.', code: 'APPLICATION_ALREADY_EXISTS' }, { status: 409 });
+    }
 
+    const timestamp = Date.now();
     const application = {
       id: applicationId,
       applicationVersion: APPLICATION_VERSION,
@@ -155,18 +189,20 @@ export async function POST(request: Request) {
       updatedAt: timestamp,
     };
 
-    await applicationRef.set(application);
-    await verificationRef.update({
-      consumedAt: timestamp,
-      applicationId,
-      updatedAt: timestamp,
-    });
+    try {
+      await applicationRef.set(application);
+      await verificationRef.update({ consumedAt: timestamp, applicationId, updatedAt: timestamp });
+    } catch (persistenceError) {
+      await applicationRef.remove().catch(() => undefined);
+      await emailIndexRef.transaction((current) => current?.applicationId === applicationId ? null : current).catch(() => undefined);
+      throw persistenceError;
+    }
 
     return NextResponse.json({ success: true, applicationId });
   } catch (error) {
-    console.error('Seller application submission failed:', error);
+    console.error('Seller application submission failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unable to submit your application.' },
+      { success: false, error: 'Unable to submit your application right now. Please retry.', code: 'APPLICATION_SUBMISSION_FAILED' },
       { status: 500 }
     );
   }

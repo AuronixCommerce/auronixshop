@@ -40,6 +40,7 @@ import {
 import {
   getMaintenanceContext,
 } from '@/lib/server-maintenance-context';
+import { ThemeProvider } from '@/components/site/theme-provider';
 
 const inter =
   Inter({
@@ -225,7 +226,7 @@ export default async function RootLayout({
               'var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
           }}
         >
-          <MaintenanceShell
+          <ThemeProvider><MaintenanceShell
             globalActive={
               globalActive
             }
@@ -245,7 +246,7 @@ export default async function RootLayout({
                 ?.endAt ??
               null
             }
-          />
+          /></ThemeProvider>
         </body>
       </html>
     );
@@ -284,11 +285,10 @@ export default async function RootLayout({
             'var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         }}
       >
-        <PublicRuntime>
-          {children}
-        </PublicRuntime>
-
-        <Toaster />
+        <ThemeProvider>
+          <PublicRuntime>{children}</PublicRuntime>
+          <Toaster />
+        </ThemeProvider>
       </body>
     </html>
   );

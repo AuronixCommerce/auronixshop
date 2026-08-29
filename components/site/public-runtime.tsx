@@ -19,6 +19,7 @@ import {
 import {
   PublicSiteChrome,
 } from '@/components/site/public-site-chrome';
+import { ThemeToggle } from '@/components/site/theme-toggle';
 
 export function PublicRuntime({
   children,
@@ -42,6 +43,7 @@ export function PublicRuntime({
     return (
       <>
         {children}
+        <ThemeToggle className="fixed bottom-5 right-5 z-[100] shadow-lg" />
       </>
     );
   }

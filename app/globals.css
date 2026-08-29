@@ -82,6 +82,8 @@
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     text-rendering: optimizeLegibility;
   }
+  html { color-scheme: light; }
+  html.dark { color-scheme: dark; }
   ::selection {
     background-color: hsl(217 91% 60% / 0.15);
   }
@@ -130,9 +132,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(220 13% 85%);
+  background: hsl(var(--border-strong));
   border-radius: 999px;
-  border: 2px solid hsl(0 0% 100%);
+  border: 2px solid hsl(var(--background));
 }
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(220 13% 75%);

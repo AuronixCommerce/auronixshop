@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { NAV_LINKS } from '@/lib/constants';
 import { MobileMenu } from './mobile-menu';
+import { ThemeToggle } from './theme-toggle';
 
 export function Header() {
   const pathname = usePathname();
@@ -257,7 +258,7 @@ export function Header() {
               className="absolute left-1/2 hidden -translate-x-1/2 lg:block"
               aria-label="Main navigation"
             >
-              <div className="flex items-center gap-0.5 rounded-full border border-white/10 bg-white/[0.025] p-1">
+            <div className="flex items-center gap-0.5 rounded-full border border-white/10 bg-white/[0.025] p-1">
                 {NAV_LINKS.map(
                   (link) => {
                     const active =
@@ -338,6 +339,7 @@ export function Header() {
 
             {/* DESKTOP ACTIONS */}
             <div className="hidden items-center gap-2 lg:flex">
+              <ThemeToggle />
               <Link
                 href="/become-a-supplier"
                 className="rounded-full px-4 py-2.5 font-sans text-[11px] font-semibold text-foreground-muted transition hover:bg-white/[0.06] hover:text-foreground"
@@ -358,7 +360,8 @@ export function Header() {
             </div>
 
             {/* MOBILE BUTTON */}
-            <div className="flex shrink-0 lg:hidden">
+            <div className="flex shrink-0 items-center gap-2 lg:hidden">
+              <ThemeToggle />
               <button
                 type="button"
                 onClick={() =>
