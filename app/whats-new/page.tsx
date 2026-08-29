@@ -23,6 +23,31 @@ type Release = {
   improvements?: string[];
 };
 
+const PLATFORM_RELEASE: Release = {
+  id: 'platform-experience-2026-08-29',
+  version: '2026.08',
+  title: 'Seller workspace and site experience upgrade',
+  summary: 'A production-focused release improving seller access, live account visibility, supplier onboarding, legal content, appearance, and transactional account flows.',
+  releaseDate: Date.UTC(2026, 7, 29),
+  features: [
+    'Live seller verification center for account, email, WhatsApp, and business-profile status.',
+    'Dedicated seller access chooser with separate login and new-account application paths.',
+    'Persistent light and dark appearance across public, authentication, seller, and admin experiences.',
+    'Database-connected seller products, catalogs, profile, settings, and support workspace.',
+    'Supplier application experience with structured validation and database persistence.',
+  ],
+  fixes: [
+    'Seller approval invitations and password reset links now use secure, reliable token handling.',
+    'Cookie Policy links now resolve correctly, including compatibility for older /cookies links.',
+    'Legal-page bold text, italics, links, and lists now render instead of appearing as raw symbols.',
+  ],
+  improvements: [
+    'Consistent Auronix circular brand mark across public, seller, admin, and account screens.',
+    'Responsive navigation and theme controls with improved desktop and mobile spacing.',
+    'Live legal-content preview for administrators before publishing updates.',
+  ],
+};
+
 export default function WhatsNewPage() {
   const [releases, setReleases] =
     useState<Release[]>([]);
@@ -42,17 +67,15 @@ export default function WhatsNewPage() {
           response.json()
       )
       .then((data) => {
-        setReleases(
-          Array.isArray(data)
-            ? data
-            : []
-        );
+        const published = Array.isArray(data) ? data as Release[] : [];
+        setReleases([PLATFORM_RELEASE, ...published.filter((release) => release.id !== PLATFORM_RELEASE.id)]);
       })
       .catch((error) => {
         console.error(
           'Unable to load changelog:',
           error
         );
+        setReleases([PLATFORM_RELEASE]);
       })
       .finally(() => {
         setLoading(false);

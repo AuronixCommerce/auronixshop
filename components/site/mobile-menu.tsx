@@ -22,8 +22,8 @@ interface MobileMenuProps {
 
 const extraLinks = [
   {
-    href: '/seller/apply',
-    label: 'Become a Seller',
+    href: '/seller',
+    label: 'Seller Login or Apply',
   },
   {
     href: '/supplier',

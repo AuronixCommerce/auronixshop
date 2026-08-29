@@ -84,10 +84,10 @@ export default function Footer() {
 
             <nav className="mt-4 space-y-3 text-sm text-foreground-muted">
               <Link
-                href="/seller/apply"
+                href="/seller"
                 className="block hover:text-foreground"
               >
-                Become a Seller
+                Seller Access
               </Link>
 
               <Link
@@ -177,10 +177,10 @@ export default function Footer() {
 
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <Link
-              href="/seller/apply"
+              href="/seller"
               className="font-medium hover:text-foreground"
             >
-              Become a Seller
+              Seller Login or Apply
             </Link>
 
             <Link
