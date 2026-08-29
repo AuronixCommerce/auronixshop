@@ -121,6 +121,7 @@ export default function SellerApplyPage() {
   const [submittedId, setSubmittedId] = useState('');
 
   const updateField = <K extends keyof FormState>(field: K, value: FormState[K]) => {
+    setError('');
     setForm(current => ({ ...current, [field]: value }));
 
     if (field === 'phone') {
@@ -146,8 +147,16 @@ export default function SellerApplyPage() {
   };
 
   const createDraft = async () => {
-    const data = await draftRequest({ action: 'start', verificationId, phone: form.phone });
-    setDraftId(data.draftId); setResumeId(data.resumeId); setStep(2);
+    setSavingDraft(true); setError('');
+    try {
+      const data = await draftRequest({ action: 'start', verificationId, phone: form.phone });
+      setDraftId(data.draftId); setResumeId(data.resumeId); setStep(2);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (draftError) {
+      setError(draftError instanceof Error ? draftError.message : 'Your number is verified, but progress could not be saved. Press Continue to retry.');
+    } finally {
+      setSavingDraft(false);
+    }
   };
 
   const resumeApplication = async () => {
@@ -403,6 +412,7 @@ export default function SellerApplyPage() {
             <div className="grid grid-cols-5 gap-2">{['WhatsApp','Email','Business','Profile','Review'].map((label, index) => <div key={label} className="text-center"><div className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${step >= index + 1 ? 'bg-primary text-primary-foreground' : 'bg-secondary text-foreground-muted'}`}>{index + 1}</div><div className="mt-2 hidden text-[10px] font-medium sm:block">{label}</div></div>)}</div>
             {!draftId && <button type="button" onClick={() => setResumeOpen(value => !value)} className="mx-auto mt-5 block text-sm font-semibold text-accent hover:underline">Resume a saved application</button>}
             {resumeOpen && !draftId && <div className="mx-auto mt-4 flex max-w-md flex-col gap-2 sm:flex-row"><input value={resumeInput} onChange={event => setResumeInput(event.target.value.toUpperCase())} placeholder="AX-XXXXXXXX" className="h-11 flex-1 rounded-xl border border-border bg-background px-4 font-mono text-sm" /><button type="button" onClick={resumeApplication} disabled={savingDraft || !resumeInput.trim()} className="rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50">Resume</button></div>}
+            {resumeOpen && !draftId && error && <div className="mx-auto max-w-md"><InlineError message={error} /></div>}
             {resumeId && <div className="mt-5 flex flex-col items-center justify-between gap-3 rounded-2xl border border-accent/20 bg-accent/5 p-4 sm:flex-row"><div><div className="text-xs font-semibold uppercase tracking-wider text-accent">Private resume ID</div><div className="mt-1 font-mono text-sm font-bold">{resumeId}</div></div><button type="button" onClick={copyResumeId} className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-2 text-sm font-semibold"><Copy className="h-4 w-4" />{copiedResume ? 'Copied' : 'Copy ID'}</button></div>}
           </div>
 
@@ -417,6 +427,7 @@ export default function SellerApplyPage() {
                     <div className="mt-1 text-sm text-foreground-muted">{maskedPhone || form.phone} has been verified successfully.</div>
                   </div>
                 </div>
+                {!draftId && <button type="button" onClick={createDraft} disabled={savingDraft} className="mt-5 inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{savingDraft ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}{savingDraft ? 'Saving...' : 'Continue to Email Verification'}</button>}
               </div>
             ) : (
               <div className="space-y-5 rounded-2xl border border-border bg-secondary/30 p-5 sm:p-6">
@@ -536,6 +547,7 @@ export default function SellerApplyPage() {
                 )}
               </div>
             )}
+            {error && !resumeOpen && <InlineError message={error} />}
           </Section>}
 
           {step === 2 && <Section eyebrow="02" title="Verify Your Email" description="Choose a personal or business email. We will send a secure six-digit code and your resume ID.">
@@ -546,6 +558,7 @@ export default function SellerApplyPage() {
             </div>
             <div className="mt-5 grid gap-3 sm:grid-cols-2"><RadioCard selected={form.preferredContact === 'business'} title="Verify business email" description={form.businessEmail || 'Enter business email above'} onSelect={() => updateField('preferredContact', 'business')} /><RadioCard selected={form.preferredContact === 'personal'} title="Verify personal email" description={form.personalEmail || 'Enter personal email above'} onSelect={() => updateField('preferredContact', 'personal')} /></div>
             {emailVerified ? <div className="mt-5 flex items-center gap-3 rounded-2xl border border-green-500/30 bg-green-500/5 p-5"><CheckCircle2 className="h-6 w-6 text-green-600" /><div><div className="font-semibold text-green-700">Email verified</div><div className="text-sm text-foreground-muted">Your resume ID was also sent to {selectedEmail}.</div></div></div> : <div className="mt-5 rounded-2xl border border-border bg-secondary/30 p-5"><button type="button" onClick={requestEmailCode} disabled={emailBusy || !form.preferredContact || !validEmail(selectedEmail)} className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">{emailBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}{emailCodeSent ? 'Send New Code' : 'Send Email Code'}</button>{emailCodeSent && <div className="mt-4 flex flex-col gap-3 sm:flex-row"><input value={emailOtp} onChange={event => setEmailOtp(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" maxLength={6} placeholder="000000" className="h-12 flex-1 rounded-xl border border-border bg-background px-4 text-center text-xl font-bold tracking-[0.35em]" /><button type="button" onClick={verifyEmailCode} disabled={emailBusy || emailOtp.length !== 6} className="rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground disabled:opacity-50">Verify Email</button></div>}</div>}
+            {error && <InlineError message={error} />}
             <div className="mt-6 flex justify-end"><button type="button" onClick={() => saveStep(3)} disabled={!emailVerified || savingDraft || !clean(form.fullName)} className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">Continue <ArrowRight className="h-4 w-4" /></button></div>
           </Section>}
 
@@ -559,6 +572,7 @@ export default function SellerApplyPage() {
             <div className="mt-5">
               <Field label="Product Categories" required value={form.productCategories} onChange={value => updateField('productCategories', value)} placeholder="Home & Kitchen, Electronics, Office Products" />
             </div>
+            {error && <InlineError message={error} />}
             <div className="mt-6 flex justify-between"><button type="button" onClick={() => setStep(2)} className="inline-flex items-center gap-2 px-3 text-sm font-semibold"><ArrowLeft className="h-4 w-4" />Back</button><button type="button" onClick={() => saveStep(4)} disabled={savingDraft || !clean(form.businessName) || !clean(form.businessType) || !clean(form.productCategories)} className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">Save & Continue <ArrowRight className="h-4 w-4" /></button></div>
           </Section>}
 
@@ -580,6 +594,7 @@ export default function SellerApplyPage() {
             <div className="mt-5">
               <Field label="Catalog URL" type="url" value={form.catalogUrl} onChange={value => updateField('catalogUrl', value)} placeholder="https://example.com/catalog" />
             </div>
+            {error && <InlineError message={error} />}
             <div className="mt-6 flex justify-between"><button type="button" onClick={() => setStep(3)} className="inline-flex items-center gap-2 px-3 text-sm font-semibold"><ArrowLeft className="h-4 w-4" />Back</button><button type="button" onClick={() => saveStep(5)} disabled={savingDraft || !clean(form.country) || !clean(form.address) || !clean(form.city) || !clean(form.state) || !clean(form.zipCode) || clean(form.businessInformation).length < 30 || clean(form.whyWorkWithAuronix).length < 20} className="inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-50">Save & Review <ArrowRight className="h-4 w-4" /></button></div>
           </Section></>}
 
@@ -606,11 +621,8 @@ export default function SellerApplyPage() {
               <input type="checkbox" checked={form.contactAgreement} onChange={event => updateField('contactAgreement', event.target.checked)} className="mt-1 h-4 w-4 accent-primary" />
               <span className="text-sm leading-6 text-foreground-muted">I agree to be contacted by Auronix Commerce LLC regarding my seller application. <span className="text-red-500">*</span></span>
             </label>
+            {error && <InlineError message={error} />}
           </Section>}
-
-          {error && (
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-sm leading-6 text-red-700">{error}</div>
-          )}
 
           {step === 5 && <div className="flex flex-col items-center gap-4 pt-2">
             <button
@@ -640,6 +652,10 @@ function Section({ eyebrow, title, description, children }: { eyebrow: string; t
       {children}
     </section>
   );
+}
+
+function InlineError({ message }: { message: string }) {
+  return <div role="alert" aria-live="polite" className="mt-4 rounded-xl border border-red-500/25 bg-red-500/5 px-4 py-3 text-sm leading-6 text-red-700 dark:text-red-300">{message}</div>;
 }
 
 function Field({ label, required = false, type = 'text', value, onChange, placeholder, min, max }: { label: string; required?: boolean; type?: string; value: string; onChange: (value: string) => void; placeholder?: string; min?: string; max?: string }) {
