@@ -32,7 +32,12 @@ type ChatMessage = {
   id: string;
   role: Role;
   content: string;
+  sessionBoundary?: boolean;
+  endedAt?: number;
 };
+
+const CHAT_STORAGE_KEY = 'auronix-ai-local-memory-v1';
+const MAX_LOCAL_MESSAGES = 60;
 
 const QUICK_QUESTIONS = [
   'What does Auronix Commerce do?',
@@ -412,6 +417,8 @@ export function AIChat() {
   const [completedThinkingSeconds, setCompletedThinkingSeconds] =
     useState(0);
 
+  const [localMemoryReady, setLocalMemoryReady] = useState(false);
+
   const [visibleAnswer, setVisibleAnswer] =
     useState('');
 
@@ -458,6 +465,50 @@ export function AIChat() {
     return () =>
       window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(CHAT_STORAGE_KEY);
+      const parsed = stored ? JSON.parse(stored) : [];
+      if (Array.isArray(parsed)) {
+        const restored = parsed
+          .filter((message: any) =>
+            message &&
+            (message.role === 'user' || message.role === 'assistant') &&
+            typeof message.content === 'string'
+          )
+          .slice(-MAX_LOCAL_MESSAGES) as ChatMessage[];
+        if (restored.some((message) => message.content.trim())) {
+          setMessages([
+            ...restored,
+            {
+              id: makeId(),
+              role: 'assistant',
+              content: '',
+              sessionBoundary: true,
+              endedAt: Date.now(),
+            },
+          ]);
+        }
+      }
+    } catch {
+      // Local memory is optional; the chat remains fully usable if storage is unavailable.
+    } finally {
+      setLocalMemoryReady(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!localMemoryReady) return;
+    try {
+      window.localStorage.setItem(
+        CHAT_STORAGE_KEY,
+        JSON.stringify(messages.slice(-MAX_LOCAL_MESSAGES))
+      );
+    } catch {
+      // Ignore browser quota or privacy-mode storage failures.
+    }
+  }, [messages, localMemoryReady]);
 
   useEffect(() => {
     if (!loading || visibleAnswer) {
@@ -674,7 +725,7 @@ export function AIChat() {
             pathname,
 
             messages:
-              nextMessages.map(
+              nextMessages.filter((message) => !message.sessionBoundary && message.content.trim()).map(
                 (message) => ({
                   role:
                     message.role,
@@ -936,7 +987,15 @@ export function AIChat() {
 
               <div className="space-y-4">
                 {messages.map(
-                  (message) => (
+                  (message) => message.sessionBoundary ? (
+                    <div key={message.id} className="flex items-center gap-3 py-1" role="separator" aria-label="Previous chat ended">
+                      <span className="h-px flex-1 bg-border" />
+                      <span className="shrink-0 rounded-full border border-border bg-secondary/50 px-3 py-1 font-sans text-[10px] font-medium text-foreground-muted">
+                        Previous chat ended · New chat
+                      </span>
+                      <span className="h-px flex-1 bg-border" />
+                    </div>
+                  ) : (
                     <div
                       key={message.id}
                       className={
