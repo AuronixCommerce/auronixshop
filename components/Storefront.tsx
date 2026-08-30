@@ -1,4 +1,250 @@
-'use client';import Link from'next/link';import{useMemo,useState}from'react';import{ArrowRight,ExternalLink,ShieldCheck,ShoppingCart,Star}from'lucide-react';import{useCatalog}from'@/lib/catalog';import{money,type Product}from'@/lib/types';import{Footer,Header}from'./Chrome';
-export function Storefront(){const{products,categories,loading,error}=useCatalog(),[category,setCategory]=useState(''),[brand,setBrand]=useState(''),[sort,setSort]=useState('featured');const brands=useMemo(()=>Array.from(new Set(products.map(p=>p.brand).filter(Boolean))).sort(),[products]);const shown=useMemo(()=>products.filter(p=>(!category||p.categoryId===category||p.subcategoryId===category)&&(!brand||p.brand===brand)).sort((a,b)=>sort==='newest'?b.createdAt-a.createdAt:sort==='low'?(a.price??Infinity)-(b.price??Infinity):sort==='high'?(b.price??-1)-(a.price??-1):sort==='rating'?(b.rating??0)-(a.rating??0):Number(b.featured)-Number(a.featured)),[products,category,brand,sort]);return <><Header/><main><section className="hero"><div className="wrap heroGrid"><div><div className="eyebrow">Curated by Auronix Commerce</div><h1>A real shop.<br/>Powered by Amazon.</h1><p>Explore a carefully managed catalog with full product details, useful filters and clear pricing—then complete your purchase securely on Amazon.</p><a className="cta" href="#catalog">Shop now <ArrowRight size={19}/></a></div><div className="trust"><div><ShieldCheck/><strong>Clear product details</strong><span>Every listing is managed by the Auronix team.</span></div><div><ShoppingCart/><strong>Amazon checkout</strong><span>Payment, delivery and returns stay on Amazon.</span></div></div></div></section><section className="section" id="catalog"><div className="wrap"><div className="sectionHead"><div><div className="eyebrow" style={{color:'#9a6200'}}>Shop the catalog</div><h2>Find the right product</h2></div><p>{loading?'Loading products…':`${shown.length} products available`}</p></div>{error&&<div className="error">{error} The storefront remains online; check the Firebase environment variables and database read rules.</div>}<div className="shopGrid"><aside className="filters"><Filter title="Categories"><button className={!category?'active':''} onClick={()=>setCategory('')}>All products</button>{categories.sort((a,b)=>a.sortOrder-b.sortOrder).map(c=><button className={category===c.id?'active':''} onClick={()=>setCategory(c.id)} key={c.id}>{c.name}</button>)}</Filter><Filter title="Brands"><button className={!brand?'active':''} onClick={()=>setBrand('')}>All brands</button>{brands.map(b=><button className={brand===b?'active':''} onClick={()=>setBrand(b)} key={b}>{b}</button>)}</Filter></aside><div><div className="toolbar"><span>Showing {shown.length} results</span><select value={sort} onChange={e=>setSort(e.target.value)}><option value="featured">Featured</option><option value="newest">Newest</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="rating">Rating</option></select></div>{!loading&&shown.length===0?<div className="empty"><h3>No published products yet</h3><p>Add products from the protected admin area and publish them when ready.</p></div>:<div className="products">{shown.map(p=><ProductCard key={p.id} product={p}/>)}</div>}</div></div></div></section><section className="section steps"><div className="wrap"><div className="sectionHead"><div><h2>Shopping is simple</h2><p>Auronix helps you discover. Amazon handles the transaction.</p></div></div><div className="stepsGrid">{['Browse the Auronix catalog','Review details and specifications','Buy securely on Amazon'].map((x,i)=><div className="step" key={x}><b>0{i+1}</b><h3>{x}</h3></div>)}</div></div></section></main><Footer/></>}
-function Filter({title,children}:{title:string;children:React.ReactNode}){return <div className="filterGroup"><h3>{title}</h3>{children}</div>}
-export function ProductCard({product:p}:{product:Product}){return <article className="card"><Link href={`/product/${p.slug}`}><div className="photo"><img src={p.mainImageUrl} alt={p.title}/>{p.badges?.[0]&&<span className="badge">{p.badges[0]}</span>}</div><div className="brand">{p.brand||p.category}</div><h3>{p.title}</h3>{typeof p.rating==='number'&&<div className="rating">{p.rating} <Star size={13} fill="currentColor"/> {p.ratingCount&&`(${p.ratingCount})`}</div>}<div className="price">{money(p.price,p.currency)||'See Amazon'}{p.oldPrice&&<del>{money(p.oldPrice,p.currency)}</del>}</div></Link><a className="amazon" href={p.amazonUrl} target="_blank" rel="sponsored nofollow noopener noreferrer">Shop on Amazon <ExternalLink size={14}/></a></article>}
+"use client";
+import Link from "next/link";
+import { useMemo, useState } from "react";
+import {
+  ArrowRight,
+  ExternalLink,
+  ShieldCheck,
+  ShoppingCart,
+  Star,
+} from "lucide-react";
+import { useCatalog } from "@/lib/catalog";
+import { money, type Product } from "@/lib/types";
+import { Footer, Header } from "./Chrome";
+export function Storefront() {
+  const { products, categories, loading, error } = useCatalog(),
+    [category, setCategory] = useState(""),
+    [brand, setBrand] = useState(""),
+    [sort, setSort] = useState("featured");
+  const brands = useMemo(
+    () =>
+      Array.from(new Set(products.map((p) => p.brand).filter(Boolean))).sort(),
+    [products],
+  );
+  const shown = useMemo(
+    () =>
+      products
+        .filter(
+          (p) =>
+            (!category ||
+              p.categoryId === category ||
+              p.subcategoryId === category) &&
+            (!brand || p.brand === brand),
+        )
+        .sort((a, b) =>
+          sort === "newest"
+            ? b.createdAt - a.createdAt
+            : sort === "low"
+              ? (a.price ?? Infinity) - (b.price ?? Infinity)
+              : sort === "high"
+                ? (b.price ?? -1) - (a.price ?? -1)
+                : sort === "rating"
+                  ? (b.rating ?? 0) - (a.rating ?? 0)
+                  : Number(b.featured) - Number(a.featured),
+        ),
+    [products, category, brand, sort],
+  );
+  return (
+    <>
+      <Header />
+      <main>
+        <section className="hero">
+          <div className="wrap heroGrid">
+            <div>
+              <div className="eyebrow">Curated by Auronix Commerce</div>
+              <h1>
+                A real shop.
+                <br />
+                Powered by Amazon.
+              </h1>
+              <p>
+                Explore a carefully managed catalog with full product details,
+                useful filters and clear pricing—then complete your purchase
+                securely on Amazon.
+              </p>
+              <a className="cta" href="#catalog">
+                Shop now <ArrowRight size={19} />
+              </a>
+            </div>
+            <div className="trust">
+              <div>
+                <ShieldCheck />
+                <strong>Clear product details</strong>
+                <span>Every listing is managed by the Auronix team.</span>
+              </div>
+              <div>
+                <ShoppingCart />
+                <strong>Amazon checkout</strong>
+                <span>Payment, delivery and returns stay on Amazon.</span>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section className="section" id="catalog">
+          <div className="wrap">
+            <div className="sectionHead">
+              <div>
+                <div className="eyebrow" style={{ color: "#9a6200" }}>
+                  Shop the catalog
+                </div>
+                <h2>Find the right product</h2>
+              </div>
+              <p>
+                {loading
+                  ? "Loading products…"
+                  : `${shown.length} products available`}
+              </p>
+            </div>
+            {error && (
+              <div className="error">
+                {error} The storefront remains online; check the Firebase
+                environment variables and database read rules.
+              </div>
+            )}
+            <div className="shopGrid">
+              <aside className="filters">
+                <Filter title="Categories">
+                  <button
+                    className={!category ? "active" : ""}
+                    onClick={() => setCategory("")}
+                  >
+                    All products
+                  </button>
+                  {categories
+                    .sort((a, b) => a.sortOrder - b.sortOrder)
+                    .map((c) => (
+                      <button
+                        className={category === c.id ? "active" : ""}
+                        onClick={() => setCategory(c.id)}
+                        key={c.id}
+                      >
+                        {c.name}
+                      </button>
+                    ))}
+                </Filter>
+                <Filter title="Brands">
+                  <button
+                    className={!brand ? "active" : ""}
+                    onClick={() => setBrand("")}
+                  >
+                    All brands
+                  </button>
+                  {brands.map((b) => (
+                    <button
+                      className={brand === b ? "active" : ""}
+                      onClick={() => setBrand(b)}
+                      key={b}
+                    >
+                      {b}
+                    </button>
+                  ))}
+                </Filter>
+              </aside>
+              <div>
+                <div className="toolbar">
+                  <span>Showing {shown.length} results</span>
+                  <select
+                    value={sort}
+                    onChange={(e) => setSort(e.target.value)}
+                  >
+                    <option value="featured">Featured</option>
+                    <option value="newest">Newest</option>
+                    <option value="low">Price: low to high</option>
+                    <option value="high">Price: high to low</option>
+                    <option value="rating">Rating</option>
+                  </select>
+                </div>
+                {!loading && shown.length === 0 ? (
+                  <div className="empty">
+                    <h3>No published products yet</h3>
+                    <p>
+                      Add products from the protected admin area and publish
+                      them when ready.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="products">
+                    {shown.map((p) => (
+                      <ProductCard key={p.id} product={p} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </section>
+        <section className="section steps">
+          <div className="wrap">
+            <div className="sectionHead">
+              <div>
+                <h2>Shopping is simple</h2>
+                <p>
+                  Auronix helps you discover. Amazon handles the transaction.
+                </p>
+              </div>
+            </div>
+            <div className="stepsGrid">
+              {[
+                "Browse the Auronix catalog",
+                "Review details and specifications",
+                "Buy securely on Amazon",
+              ].map((x, i) => (
+                <div className="step" key={x}>
+                  <b>0{i + 1}</b>
+                  <h3>{x}</h3>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+      <Footer />
+    </>
+  );
+}
+function Filter({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="filterGroup">
+      <h3>{title}</h3>
+      {children}
+    </div>
+  );
+}
+export function ProductCard({ product: p }: { product: Product }) {
+  return (
+    <article className="card">
+      <Link href={`/product/${p.slug}`}>
+        <div className="photo">
+          <img src={p.mainImageUrl} alt={p.title} />
+          {p.badges?.[0] && <span className="badge">{p.badges[0]}</span>}
+        </div>
+        <div className="brand">{p.brand || p.category}</div>
+        <h3>{p.title}</h3>
+        {typeof p.rating === "number" && (
+          <div className="rating">
+            {p.rating} <Star size={13} fill="currentColor" />{" "}
+            {p.ratingCount && `(${p.ratingCount})`}
+          </div>
+        )}
+        <div className="price">
+          {money(p.price, p.currency) || "See Amazon"}
+          {p.oldPrice && <del>{money(p.oldPrice, p.currency)}</del>}
+        </div>
+      </Link>
+      <a
+        className="amazon"
+        href={p.amazonUrl}
+        target="_blank"
+        rel="sponsored nofollow noopener noreferrer"
+      >
+        Shop on Amazon <ExternalLink size={14} />
+      </a>
+    </article>
+  );
+}
