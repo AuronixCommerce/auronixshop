@@ -3,12 +3,12 @@ import { SHOP_SITE_URL } from '@/lib/shop';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SHOP_SITE_URL),
-  title: { default: 'Auronix Select | Curated Amazon Finds', template: '%s | Auronix Select' },
-  description: 'A focused catalog of products to discover on Amazon, curated by Auronix Commerce.',
+  title: { default: 'Auronix Commerce Shop | Curated Amazon Products', template: '%s | Auronix Commerce Shop' },
+  description: 'Discover products curated by Auronix Commerce and complete your purchase on Amazon.',
   alternates: { canonical: SHOP_SITE_URL },
   robots: { index: true, follow: true },
-  openGraph: { type: 'website', url: SHOP_SITE_URL, siteName: 'Auronix Select', title: 'Auronix Select | Curated Amazon Finds', description: 'A focused catalog of products to discover on Amazon.' },
-  twitter: { card: 'summary', title: 'Auronix Select', description: 'A focused catalog of products to discover on Amazon.' },
+  openGraph: { type: 'website', url: SHOP_SITE_URL, siteName: 'Auronix Commerce Shop', title: 'Auronix Commerce Shop', description: 'Curated products to discover and purchase on Amazon.' },
+  twitter: { card: 'summary', title: 'Auronix Commerce Shop', description: 'Curated Amazon product discoveries.' },
 };
 
 export default function ShopLayout({ children }: { children: React.ReactNode }) {

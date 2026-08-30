@@ -4,6 +4,7 @@ import {
   isValidNewsletterEmail,
   subscribeToNewsletter,
 } from '@/lib/server-newsletter';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 export async function POST(
   request: Request
@@ -33,6 +34,8 @@ export async function POST(
 
     const body =
       await request.json();
+
+    await protectPublicRequest(request, 'newsletter-subscribe', body, { limit: 5, windowMs: 15 * 60_000 });
 
     const email =
       typeof body?.email ===
@@ -91,6 +94,8 @@ export async function POST(
           Boolean(
             result.alreadySubscribed
           ),
+
+        confirmationRequired: Boolean(result.confirmationRequired),
       },
       {
         status: 200,
@@ -103,6 +108,8 @@ export async function POST(
   } catch (
     error
   ) {
+    const protectedError = publicRequestErrorResponse(error);
+    if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status, headers: protectedError.body.retryAfter ? { 'Retry-After': String(protectedError.body.retryAfter) } : undefined });
     console.error(
       'Newsletter subscription API error:',
       error

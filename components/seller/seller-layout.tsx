@@ -9,7 +9,7 @@ import { onAuthChange, signOut } from '@/lib/auth';
 import type { UserProfile } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AuronixMark } from '@/components/site/auronix-mark';
-import { LayoutDashboard, User, Package, FileText, LifeBuoy, Settings, LogOut, Loader2 } from 'lucide-react';
+import { LayoutDashboard, User, Package, FileText, LifeBuoy, Settings, LogOut, Loader2, Bell } from 'lucide-react';
 
 const NAV = [
   { label: 'Overview', href: '/seller/dashboard', icon: LayoutDashboard },
@@ -17,6 +17,7 @@ const NAV = [
   { label: 'Products', href: '/seller/dashboard/products', icon: Package },
   { label: 'Catalogs', href: '/seller/dashboard/catalogs', icon: FileText },
   { label: 'Support', href: '/seller/support', icon: LifeBuoy },
+  { label: 'Notifications', href: '/seller/notifications', icon: Bell },
   { label: 'Settings', href: '/seller/settings', icon: Settings },
 ];
 

@@ -4,6 +4,7 @@ import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { normalizePhone } from '@/lib/seller-whatsapp';
 import { normalizeEmail } from '@/lib/server-seller-invitations';
 import { sendSellerEmailVerification, sendSellerResumeIdEmail } from '@/lib/server-mail';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 export const runtime = 'nodejs';
 const OTP_TTL = 10 * 60 * 1000;
@@ -30,6 +31,7 @@ async function authorize(draftId: string, resumeId: string) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    await protectPublicRequest(request, 'seller-application-draft', body, { limit: 30, windowMs: 15 * 60_000 });
     const action = String(body?.action || '');
     if (action === 'start') {
       const verificationId = String(body?.verificationId || '').trim();
@@ -110,6 +112,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ error: 'Unsupported draft action.' }, { status: 400 });
   } catch (error) {
+    const protectedError = publicRequestErrorResponse(error); if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status });
     console.error('Seller application draft failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json({ error: 'Unable to update the saved application right now.' }, { status: 500 });
   }

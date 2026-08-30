@@ -1,10 +1,11 @@
 ﻿import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { requireAdmin } from '@/lib/server-auth';
+import { writeAuditLog } from '@/lib/server-audit';
 
 export async function POST(request: Request) {
   try {
-    await requireAdmin(request);
+    const admin = await requireAdmin(request);
 
     const body = await request.json();
     const applicationId = String(
@@ -32,6 +33,8 @@ export async function POST(request: Request) {
     }
 
     await applicationRef.remove();
+
+    await writeAuditLog({ actorUid: admin.uid, actorEmail: admin.email || '', action: 'SELLER_APPLICATION_DELETED', targetType: 'sellerApplication', targetId: applicationId, summary: 'Seller application permanently deleted.', request });
 
     return NextResponse.json({
       success: true,

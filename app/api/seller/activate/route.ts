@@ -45,6 +45,7 @@ export async function POST(request: Request) {
         [`sellerApplications/${applicationId}/invitationTokenHash`]: null,
         [`sellerApplications/${applicationId}/invitationExpires`]: null,
         [`sellerApplications/${applicationId}/updatedAt`]: now,
+        [`sellerNotifications/${user.uid}/welcome`]: { id: 'welcome', type: 'account', title: 'Seller account activated', message: 'Your approved Auronix seller account is active and connected to your application.', href: '/seller/dashboard', createdAt: now },
       });
     } catch (error) {
       await adminAuth.deleteUser(user.uid).catch(() => undefined);

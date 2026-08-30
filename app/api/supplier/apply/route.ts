@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 const clean = (value: unknown, max = 2000) => String(value || '').trim().slice(0, max);
 const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -7,6 +8,7 @@ const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    await protectPublicRequest(request, 'supplier-application', body, { limit: 5, windowMs: 60 * 60_000 });
     const companyName = clean(body.companyName, 200); const contactName = clean(body.contactName, 160);
     const email = clean(body.email, 320).toLowerCase(); const phone = clean(body.phone, 60); const categories = clean(body.categories, 1000);
     if (!companyName || !contactName || !validEmail(email) || !phone || !categories || body.consent !== true) {
@@ -22,6 +24,7 @@ export async function POST(request: Request) {
     const ref = adminDb.ref('suppliers').push(); await ref.set({ id: ref.key, ...submission });
     return NextResponse.json({ success: true, submissionId: ref.key }, { status: 201 });
   } catch (error) {
+    const protectedError = publicRequestErrorResponse(error); if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status });
     console.error('Supplier submission failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json({ error: 'Unable to submit supplier information right now. Please retry.', code: 'SUPPLIER_SUBMISSION_FAILED' }, { status: 500 });
   }

@@ -2,6 +2,7 @@
 import crypto from 'crypto';
 
 import { adminDb } from '@/lib/firebase-admin';
+import { sendNewsletterOptInEmail } from '@/lib/server-mail';
 
 const SMTP_HOST =
   process.env.SMTP_HOST ||
@@ -22,7 +23,7 @@ const SMTP_PASSWORD =
   '';
 
 const SUPPORT_EMAIL =
-  process.env.MAIL_REPLY_TO || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || process.env.SUPPORT_EMAIL ||
+  process.env.MAIL_SUPPORT_EMAIL || process.env.NEXT_PUBLIC_SUPPORT_EMAIL ||
   SMTP_USER ||
   '';
 
@@ -118,176 +119,43 @@ export async function subscribeToNewsletter(
   name = '',
   source = 'footer'
 ) {
-  const normalized =
-    normalizeNewsletterEmail(
-      email
-    );
+  const normalized = normalizeNewsletterEmail(email);
+  if (!isValidNewsletterEmail(normalized)) throw new Error('Please enter a valid email address.');
+  const subscribersRef = adminDb.ref('newsletterSubscribers');
+  const snapshot = await subscribersRef.get();
+  const records = snapshot.exists() ? snapshot.val() as Record<string, Record<string, unknown>> : {};
+  const match = Object.entries(records).find(([, record]) => normalizeNewsletterEmail(String(record.email || '')) === normalized);
+  const existingId = match?.[0] || '';
+  const existingRecord = match?.[1] || null;
+  if (existingRecord?.active === true) return { success: true, alreadySubscribed: true, confirmationRequired: false };
 
-  if (
-    !isValidNewsletterEmail(
-      normalized
-    )
-  ) {
-    throw new Error(
-      'Please enter a valid email address.'
-    );
-  }
-
-  const subscribersRef =
-    adminDb.ref(
-      'newsletterSubscribers'
-    );
-
-  const snapshot =
-    await subscribersRef.get();
-
-  let existingId:
-    | string
-    | null =
-    null;
-
-  let existingRecord:
-    | Record<
-        string,
-        unknown
-      >
-    | null =
-    null;
-
-  if (
-    snapshot.exists()
-  ) {
-    const records =
-      snapshot.val() as Record<
-        string,
-        Record<
-          string,
-          unknown
-        >
-      >;
-
-    for (
-      const [
-        id,
-        record,
-      ] of Object.entries(
-        records
-      )
-    ) {
-      if (
-        normalizeNewsletterEmail(
-          String(
-            record.email ||
-              ''
-          )
-        ) ===
-        normalized
-      ) {
-        existingId =
-          id;
-
-        existingRecord =
-          record;
-
-        break;
-      }
-    }
-  }
-
-  const now =
-    Date.now();
-
-  if (
-    existingId &&
-    existingRecord
-  ) {
-    await subscribersRef
-      .child(
-        existingId
-      )
-      .update({
-        email:
-          normalized,
-
-        name:
-          name.trim() ||
-          String(
-            existingRecord.name ||
-              ''
-          ),
-
-        active:
-          true,
-
-        source:
-          source || 'footer',
-
-        resubscribedAt:
-          now,
-
-        updatedAt:
-          now,
-      });
-
-    return {
-      success:
-        true,
-
-      alreadySubscribed:
-        true,
-    };
-  }
-
-  const id =
-    subscribersRef.push()
-      .key;
-
-  if (!id) {
-    throw new Error(
-      'Unable to create newsletter subscription.'
-    );
-  }
-
-  const token =
-    makeToken();
-
-  await subscribersRef
-    .child(id)
-    .set({
-      id,
-
-      email:
-        normalized,
-
-      name:
-        name.trim(),
-
-      active:
-        true,
-
-      source:
-        source || 'footer',
-
-      unsubscribeToken:
-        token,
-
-      subscribedAt:
-        now,
-
-      updatedAt:
-        now,
-
-      createdAt:
-        now,
-    });
-
-  return {
-    success:
-      true,
-
-    alreadySubscribed:
-      false,
-  };
+  const now = Date.now();
+  const id = existingId || subscribersRef.push().key;
+  if (!id) throw new Error('Unable to create newsletter subscription.');
+  const confirmationToken = makeToken();
+  const confirmationTokenHash = crypto.createHash('sha256').update(confirmationToken).digest('hex');
+  const confirmationExpiresAt = now + 24 * 60 * 60 * 1000;
+  const unsubscribeToken = String(existingRecord?.unsubscribeToken || makeToken());
+  await subscribersRef.child(id).update({
+    id,
+    email: normalized,
+    name: name.trim() || String(existingRecord?.name || ''),
+    active: false,
+    suppressed: false,
+    pendingConfirmation: true,
+    confirmationTokenHash,
+    confirmationExpiresAt,
+    confirmationRequestedAt: now,
+    source: source || 'footer',
+    unsubscribeToken,
+    frequency: String(existingRecord?.frequency || 'weekly'),
+    topics: existingRecord?.topics || { company: true, sourcing: true, sellers: true, suppliers: true },
+    updatedAt: now,
+    createdAt: Number(existingRecord?.createdAt || now),
+  });
+  await adminDb.ref(`newsletterConfirmationIndex/${confirmationTokenHash}`).set({ subscriberId: id, expiresAt: confirmationExpiresAt });
+  await sendNewsletterOptInEmail({ email: normalized, confirmationUrl: `${WEBSITE.replace(/\/$/, '')}/newsletter/confirm?token=${encodeURIComponent(confirmationToken)}`, expiresAt: confirmationExpiresAt });
+  return { success: true, alreadySubscribed: false, confirmationRequired: true };
 }
 
 export async function unsubscribeFromNewsletter(
@@ -393,7 +261,8 @@ function buildUnsubscribeUrl(
 
 function ensureNewsletterHtml(
   html: string,
-  unsubscribeUrl: string
+  unsubscribeUrl: string,
+  preferencesUrl: string
 ): string {
   return `
 <!doctype html>
@@ -422,6 +291,8 @@ function ensureNewsletterHtml(
         </p>
 
         <p style="margin:0;">
+          <a href="${preferencesUrl}" style="color:#0071e3;text-decoration:none;">Manage preferences</a>
+          <span aria-hidden="true"> · </span>
           <a
             href="${unsubscribeUrl}"
             style="color:#0071e3;text-decoration:none;"
@@ -455,6 +326,8 @@ export async function sendNewsletterEmail(
       subscriber.unsubscribeToken
     );
 
+  const preferencesUrl = `${WEBSITE.replace(/\/$/, '')}/newsletter/preferences?token=${encodeURIComponent(subscriber.unsubscribeToken)}`;
+
   const personalizedHtml =
     html.replace(
       /\{\{\s*name\s*\}\}/gi,
@@ -467,12 +340,13 @@ export async function sendNewsletterEmail(
   const wrappedHtml =
     ensureNewsletterHtml(
       personalizedHtml,
-      unsubscribeUrl
+      unsubscribeUrl,
+      preferencesUrl
     );
 
-  await transport.sendMail({
+  return transport.sendMail({
     from:
-      `"Auronix Commerce LLC" <${process.env.MAIL_NOTIFICATION_FROM || 'notifications@auronixcommerce.com'}>`,
+      `"${process.env.MAIL_FROM_NAME || 'Auronix Commerce LLC'}" <${process.env.MAIL_FROM || SMTP_USER}>`,
 
     to:
       subscriber.email,
@@ -484,7 +358,7 @@ export async function sendNewsletterEmail(
       subject.trim(),
 
     text:
-      `${text.trim()}\n\nUnsubscribe: ${unsubscribeUrl}`,
+      `${text.trim()}\n\nManage preferences: ${preferencesUrl}\nUnsubscribe: ${unsubscribeUrl}`,
 
     html:
       wrappedHtml,

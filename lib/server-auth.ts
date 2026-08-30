@@ -1,5 +1,6 @@
 ﻿import { adminDb } from '@/lib/firebase-admin';
 import { adminAuth } from '@/lib/firebase-admin';
+import { verifyAdminSession } from '@/lib/server-admin-session';
 
 export async function verifyIdToken(request: Request) {
   const header = request.headers.get('authorization');
@@ -22,6 +23,8 @@ export async function requireAdmin(request: Request) {
 
   // First allow an explicit Firebase custom claim.
   if (decoded.role === 'admin') {
+    const session = await verifyAdminSession(decoded.uid);
+    if (!session.valid) throw new Error('Admin two-factor verification required.');
     return decoded;
   }
 
@@ -51,5 +54,8 @@ export async function requireSeller(request: Request) {
   if (!snapshot.exists() || !['seller', 'admin'].includes(profile?.role) || profile?.status === 'disabled') {
     throw new Error('Seller access required.');
   }
+
+  const session = await verifyAdminSession(decoded.uid);
+  if (!session.valid) throw new Error('Admin two-factor verification required.');
   return decoded;
 }

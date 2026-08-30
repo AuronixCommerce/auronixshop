@@ -700,9 +700,7 @@ export default function AdminNewsletterPage() {
 
           <div className="grid grid-cols-2 gap-3">
 
-            <Link href="/admin/newsletter/reasons" className="col-span-2 inline-flex items-center justify-center rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-semibold transition hover:bg-secondary">
-              View unsubscribe reasons
-            </Link>
+            <div className="col-span-2 grid grid-cols-3 gap-3"><Link href="/admin/newsletter/subscribers" className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-3 py-2.5 text-center text-xs font-semibold transition hover:bg-secondary">Manage subscribers</Link><Link href="/admin/newsletter/reasons" className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-3 py-2.5 text-center text-xs font-semibold transition hover:bg-secondary">Unsubscribe reasons</Link><Link href="/admin/newsletter/analytics" className="inline-flex items-center justify-center rounded-xl border border-border bg-card px-3 py-2.5 text-center text-xs font-semibold transition hover:bg-secondary">Analytics</Link></div>
 
             <div className="rounded-2xl border border-border bg-card p-4">
               <Users className="h-4 w-4 text-foreground-muted" />

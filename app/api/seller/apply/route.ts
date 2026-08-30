@@ -4,6 +4,7 @@ import { createHash } from 'crypto';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { normalizePhone } from '@/lib/seller-whatsapp';
 import { normalizeEmail } from '@/lib/server-seller-invitations';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 export const runtime = 'nodejs';
 
@@ -23,6 +24,7 @@ function validEmail(value: string): boolean {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    await protectPublicRequest(request, 'seller-application-submit', body, { limit: 5, windowMs: 60 * 60_000 });
     const form = body?.form || {};
     const verificationId = text(body?.verificationId);
     const draftId = text(body?.draftId);
@@ -212,6 +214,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, applicationId });
   } catch (error) {
+    const protectedError = publicRequestErrorResponse(error); if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status });
     console.error('Seller application submission failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json(
       { success: false, error: 'Unable to submit your application right now. Please retry.', code: 'APPLICATION_SUBMISSION_FAILED' },

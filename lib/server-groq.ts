@@ -4,6 +4,7 @@ const GROQ_API_KEY =
   process.env.GROQ_API_KEY?.trim() || '';
 
 const GROQ_MODEL =
+  process.env.GROQ_MODEL?.trim() ||
   'openai/gpt-oss-120b';
 
 if (!GROQ_API_KEY) {
@@ -46,8 +47,8 @@ export async function generateGroqResponse(
   }
 
   try {
-    const completion =
-      await groq.chat.completions.create(
+    const request = async (reasoningEffort: 'high' | 'medium') =>
+      groq.chat.completions.create(
         {
           model:
             GROQ_MODEL,
@@ -73,7 +74,7 @@ export async function generateGroqResponse(
           temperature:
             0.35,
 
-          max_tokens:
+          max_completion_tokens:
             Math.min(
               Math.max(
                 maxTokens,
@@ -88,21 +89,31 @@ export async function generateGroqResponse(
            * answer quality for the public assistant.
            */
           reasoning_effort:
-            'high',
+            reasoningEffort,
 
           /*
            * Keep reasoning hidden from visitors.
            */
-          reasoning_format:
-            'hidden',
+          include_reasoning:
+            false,
         }
       );
 
-    const content =
+    let completion = await request('high');
+
+    let content =
       completion
         .choices?.[0]
         ?.message
         ?.content;
+
+    // A reasoning model can occasionally spend its entire completion budget
+    // before emitting final content. Retry once with a smaller reasoning budget
+    // instead of surfacing a misleading empty-response error to the admin.
+    if (typeof content !== 'string' || !content.trim()) {
+      completion = await request('medium');
+      content = completion.choices?.[0]?.message?.content;
+    }
 
     if (
       typeof content !==

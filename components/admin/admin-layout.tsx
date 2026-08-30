@@ -13,13 +13,13 @@ import { AuronixMark } from '@/components/site/auronix-mark';
 import {
   LayoutDashboard, UserCheck, Package, Mail, Ticket, FileText,
   HelpCircle, Briefcase, Users, Scale, Sparkles, Building2,
-  UsersRound, Settings, LogOut, Loader2, Search, Bell,
+  UsersRound, Settings, LogOut, Loader2, Search, Bell, ScrollText, ShieldCheck, ShoppingBag,
 } from 'lucide-react';
 
 const ICON_MAP: Record<string, any> = {
   LayoutDashboard, UserCheck, Package, Mail, Ticket, FileText,
   HelpCircle, Briefcase, Users, Scale, Sparkles, Building2,
-  UsersRound, Settings,
+  UsersRound, Settings, ScrollText, ShieldCheck, ShoppingBag,
 };
 
 export function AdminLayout({ children }: { children: ReactNode }) {
@@ -40,6 +40,10 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           router.push('/admin/login');
           return;
         }
+        const token = await firebaseUser.getIdToken();
+        const sessionResponse = await fetch('/api/admin/session/status', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+        const session = await sessionResponse.json();
+        if (!sessionResponse.ok || !session.valid) { router.push('/admin/login'); return; }
         setUser(profile);
       } catch {
         router.push('/admin/login');
@@ -51,6 +55,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   }, [router]);
 
   const handleSignOut = async () => {
+    const token = await auth.currentUser?.getIdToken();
+    await fetch('/api/admin/session/logout', { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} }).catch(() => undefined);
     await signOut();
     router.push('/admin/login');
   };

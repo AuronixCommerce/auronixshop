@@ -136,6 +136,11 @@ export async function POST(
           : 'in-progress',
     });
 
+    if (ticket?.sellerUid) {
+      const notification = adminDb.ref(`sellerNotifications/${ticket.sellerUid}`).push();
+      await notification.set({ id: notification.key, type: 'support', title: 'Support replied to your ticket', message: text(ticket?.subject) || 'Auronix Support sent a new response.', href: '/seller/support', ticketId, createdAt: Date.now() });
+    }
+
     await sendTicketResponseEmail({
       to:
         customerEmail,

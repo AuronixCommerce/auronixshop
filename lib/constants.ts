@@ -347,8 +347,9 @@ export const SELLER_STATUSES = [
   'archived',
 ] as const;
 
-export const ADMIN_NAV = [
-  { label: 'Overview', href: '/admin', icon: 'LayoutDashboard' },
+  export const ADMIN_NAV = [
+    { label: 'Overview', href: '/admin', icon: 'LayoutDashboard' },
+    { label: 'Affiliate Shop', href: '/admin/shop', icon: 'ShoppingBag' },
   { label: 'Seller Applications', href: '/admin/sellers', icon: 'UserCheck' },
   { label: 'Supplier Submissions', href: '/admin/suppliers', icon: 'Package' },
   { label: 'Contact Messages', href: '/admin/contact', icon: 'Mail' },
@@ -361,6 +362,8 @@ export const ADMIN_NAV = [
   { label: 'AI', href: '/admin/ai', icon: 'Sparkles' },
   { label: 'Business Information', href: '/admin/settings/business', icon: 'Building2' },
   { label: 'Users', href: '/admin/users', icon: 'UsersRound' },
+  { label: 'Audit Logs', href: '/admin/audit', icon: 'ScrollText' },
+  { label: 'Security', href: '/admin/security', icon: 'ShieldCheck' },
   { label: 'Settings', href: '/admin/settings', icon: 'Settings' },
 ] as const;
 

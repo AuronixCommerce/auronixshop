@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { isValidNewsletterEmail, normalizeNewsletterEmail } from '@/lib/server-newsletter';
 import { sendNewsletterUnsubscribeEmail } from '@/lib/server-mail';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +13,7 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    await protectPublicRequest(request, 'newsletter-unsubscribe-request', body, { limit: 5, windowMs: 30 * 60_000 });
     const email = normalizeNewsletterEmail(String(body?.email || ''));
     if (!isValidNewsletterEmail(email)) return NextResponse.json({ success: false, error: 'Enter a valid email address.' }, { status: 400 });
 
@@ -42,6 +44,7 @@ export async function POST(request: Request) {
     await requestRef.update({ sentAt: Date.now(), updatedAt: Date.now() });
     return NextResponse.json({ success: true, message: 'If this address is subscribed, a confirmation email has been sent.' });
   } catch (error) {
+    const protectedError = publicRequestErrorResponse(error); if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status });
     console.error('Newsletter unsubscribe request failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json({ success: false, error: 'Unable to send the confirmation email right now. Please retry.' }, { status: 500 });
   }

@@ -9,8 +9,10 @@ import {
 } from '@/lib/server-auth';
 
 import {
-  sendProfessionalEmail,
-} from '@/lib/server-mail';
+  sendNewsletterEmail,
+} from '@/lib/server-newsletter';
+import { writeAuditLog } from '@/lib/server-audit';
+import { randomBytes } from 'crypto';
 
 const WEBSITE =
   'https://auronixcommerce.com';
@@ -216,7 +218,7 @@ export async function POST(
   request: Request
 ) {
   try {
-    await requireAdmin(
+    const decoded = await requireAdmin(
       request
     );
 
@@ -297,9 +299,11 @@ export async function POST(
             rawSubscribers as Record<
               string,
               {
-                email?: unknown;
-                active?: unknown;
-                name?: unknown;
+                  email?: unknown;
+                  active?: unknown;
+                  name?: unknown;
+                  id?: unknown;
+                  unsubscribeToken?: unknown;
               }
             >
           )
@@ -420,35 +424,14 @@ export async function POST(
         );
 
       try {
-        await sendProfessionalEmail({
-          to:
-            email,
-
-          name,
-
-          subject,
-
-          body:
-            finalText,
-
-          htmlBody:
-            finalHtml,
-
-          type:
-            'general',
-
-          relatedRecordId:
-            campaignId,
-
-          relatedRecordType:
-            'newsletter-campaign',
-
-          automated:
-            true,
-        });
+        const unsubscribeToken = clean(subscriber?.unsubscribeToken, 200) || randomBytes(32).toString('hex');
+        if (!subscriber?.unsubscribeToken && subscriber?.id) await adminDb.ref(`newsletterSubscribers/${clean(subscriber.id, 200)}`).update({ unsubscribeToken, updatedAt: Date.now() });
+        const delivery = await sendNewsletterEmail({ email, name, unsubscribeToken }, subject, html, suppliedText);
 
         sent +=
           1;
+
+        await campaignRef.child('deliveries').push().set({ subscriberId: clean(subscriber?.id, 200), email, status: 'sent', providerMessageId: clean((delivery as any)?.messageId, 500), sentAt: Date.now(), updatedAt: Date.now() });
       } catch (
         error
       ) {
@@ -463,6 +446,8 @@ export async function POST(
               ? error.message
               : 'Unknown email error.',
         });
+
+        await campaignRef.child('deliveries').push().set({ subscriberId: clean(subscriber?.id, 200), email, status: 'failed', error: error instanceof Error ? error.message.slice(0, 500) : 'Unknown email error.', failedAt: Date.now(), updatedAt: Date.now() });
       }
 
       await campaignRef.update({
@@ -498,6 +483,8 @@ export async function POST(
           ? failures
           : null,
     });
+
+    await writeAuditLog({ actorUid: decoded.uid, actorEmail: decoded.email || '', action: 'NEWSLETTER_CAMPAIGN_SENT', targetType: 'newsletterCampaign', targetId: campaignId, summary: `Newsletter sent to ${sent} subscriber(s); ${failed} failed.`, metadata: { subject, sent, failed }, request });
 
     return NextResponse.json({
       success:

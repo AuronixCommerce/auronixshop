@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'crypto';
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
 import { isValidNewsletterEmail, normalizeNewsletterEmail } from '@/lib/server-newsletter';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +13,7 @@ const allowedReasons = new Set(['too_many_emails', 'not_relevant', 'never_signed
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    await protectPublicRequest(request, 'newsletter-unsubscribe-confirm', body, { limit: 12, windowMs: 30 * 60_000 });
     const token = String(body?.token || '').trim();
     const email = normalizeNewsletterEmail(String(body?.email || ''));
     const code = String(body?.code || '').replace(/\D/g, '').slice(0, 6);
@@ -68,6 +70,7 @@ export async function POST(request: Request) {
     ]);
     return NextResponse.json({ success: true });
   } catch (error) {
+    const protectedError = publicRequestErrorResponse(error); if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status });
     console.error('Newsletter unsubscribe confirmation failed:', error instanceof Error ? error.message : 'Unknown error');
     return NextResponse.json({ success: false, error: 'Unable to update your newsletter preference right now.' }, { status: 500 });
   }

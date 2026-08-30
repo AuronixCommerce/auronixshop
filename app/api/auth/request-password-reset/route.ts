@@ -1,10 +1,12 @@
 ﻿import { NextResponse } from 'next/server';
 import { adminAuth } from '@/lib/firebase-admin';
 import { sendPasswordResetEmail } from '@/lib/server-mail';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    await protectPublicRequest(request, 'password-reset', body, { limit: 5, windowMs: 30 * 60_000 });
     const email = String(body.email || '').trim().toLowerCase();
 
     if (!email) {
@@ -50,6 +52,8 @@ export async function POST(request: Request) {
         'If an account exists for this email, reset instructions have been sent.',
     });
   } catch (error) {
+    const protectedError = publicRequestErrorResponse(error);
+    if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status });
     console.error(
       'Password reset request failed:',
       error

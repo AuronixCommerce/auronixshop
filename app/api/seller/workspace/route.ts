@@ -57,6 +57,7 @@ export async function POST(request: Request) {
       if (!name || !['http:', 'https:'].includes(url.protocol)) return errorResponse('Catalog name and a valid HTTPS/HTTP URL are required.', 'VALIDATION_ERROR', 400);
       const item = { name, url: url.toString(), description: clean(body.description), createdAt: now, updatedAt: now };
       const ref = adminDb.ref(`sellerData/${uid}/catalogs`).push(); await ref.set(item);
+      const notification = adminDb.ref(`sellerNotifications/${uid}`).push(); await notification.set({ id: notification.key, type: 'catalog', title: 'Catalog added', message: `${name} is now connected to your seller workspace.`, href: '/seller/dashboard/catalogs', createdAt: now });
       return NextResponse.json({ success: true, item: { id: ref.key, ...item } }, { status: 201 });
     }
     if (resource === 'ticket') {

@@ -2,9 +2,10 @@ import nodemailer from 'nodemailer';
 
 export type EmailType = string;
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || process.env.APP_URL || 'https://auronixcommerce.com').replace(/\/+$/, '');
-export const NOTIFICATION_EMAIL = process.env.MAIL_NOTIFICATION_FROM || 'notifications@auronixcommerce.com';
-export const BUSINESS_EMAIL = process.env.MAIL_BUSINESS_FROM || 'business@auronixcommerce.com';
-export const SUPPORT_EMAIL = process.env.MAIL_REPLY_TO || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || BUSINESS_EMAIL;
+export const BUSINESS_EMAIL = process.env.MAIL_FROM || process.env.SMTP_USER || 'business@auronixcommerce.com';
+export const NOTIFICATION_EMAIL = process.env.MAIL_FROM || BUSINESS_EMAIL;
+export const SUPPORT_EMAIL = process.env.MAIL_SUPPORT_EMAIL || process.env.NEXT_PUBLIC_SUPPORT_EMAIL || BUSINESS_EMAIL;
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || 'Auronix Commerce LLC';
 const SMTP_HOST = process.env.SMTP_HOST || 'smtp.hostinger.com';
 const SMTP_PORT = Number(process.env.SMTP_PORT || 465);
 const SMTP_SECURE = process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : SMTP_PORT === 465;
@@ -30,7 +31,7 @@ async function sendWithSender(sender: string, options: MailOptions) {
   if (!options.to || (Array.isArray(options.to) && !options.to.length)) throw new Error('Email recipient is required.');
   if (!SMTP_PASSWORD) throw new Error('Email service is not configured. Set SMTP_PASSWORD.');
   const transporter = nodemailer.createTransport({ host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_SECURE, auth: { user: SMTP_USER, pass: SMTP_PASSWORD } });
-  return transporter.sendMail({ from: { name: options.fromName || 'Auronix Commerce LLC', address: sender }, to: options.to, subject: options.subject, html: options.html, text: options.text, replyTo: options.replyTo || SUPPORT_EMAIL });
+  return transporter.sendMail({ from: { name: options.fromName || MAIL_FROM_NAME, address: sender }, to: options.to, subject: options.subject, html: options.html, text: options.text, replyTo: options.replyTo || SUPPORT_EMAIL });
 }
 
 export const sendNotificationMail = (options: MailOptions) => sendWithSender(NOTIFICATION_EMAIL, options);
@@ -73,6 +74,19 @@ export async function sendNewsletterUnsubscribeEmail(input: { email: string; uns
   const expiry = new Date(input.expiresAt).toLocaleTimeString('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
   const html = emailShell({ preheader: 'Confirm that you want to stop receiving Auronix Commerce newsletters.', title: 'Confirm newsletter unsubscribe', footerNote: 'This link and verification code expire soon. If you did not request this, no action is required.', body: `<h1 style="margin:0 0 16px;font-size:27px;line-height:1.2">Unsubscribe from newsletters?</h1><p>We received a request to stop newsletter emails for <strong>${escapeHtml(input.email)}</strong>.</p>${cta('Review unsubscribe request', url)}<p>Or enter this six-digit confirmation code on the unsubscribe page:</p><div style="margin:22px 0;padding:17px;border-radius:14px;background:#f3f4f6;text-align:center;font-size:30px;font-weight:800;letter-spacing:.22em">${escapeHtml(input.code)}</div><p style="color:#6b7280;font-size:13px">The link and code expire at <strong>${escapeHtml(expiry)} UTC</strong>. You will remain subscribed until you confirm.</p>` });
   return sendNotificationMail({ to: input.email, subject: 'Confirm your Auronix newsletter unsubscribe request', html, text: `Confirm that you want to unsubscribe from Auronix Commerce newsletters:\n${url}\n\nConfirmation code: ${input.code}\nExpires at ${expiry} UTC. If you did not request this, no action is required.` });
+}
+
+export async function sendNewsletterOptInEmail(input: { email: string; confirmationUrl: string; expiresAt: number }) {
+  const url = safeAbsoluteUrl(input.confirmationUrl, `${SITE_URL}/newsletter/confirm`);
+  const expiry = new Date(input.expiresAt).toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC';
+  const html = emailShell({ preheader: 'Confirm your Auronix Commerce newsletter subscription.', title: 'Confirm your newsletter subscription', footerNote: 'You will not receive newsletters unless you confirm. If you did not request this, no action is required.', body: `<h1 style="margin:0 0 16px;font-size:27px;line-height:1.2">One click to confirm</h1><p>Confirm that <strong>${escapeHtml(input.email)}</strong> should receive Auronix Commerce newsletters.</p>${cta('Confirm subscription', url)}<p style="color:#6b7280;font-size:13px">This secure confirmation link expires on <strong>${escapeHtml(expiry)}</strong>.</p>` });
+  return sendNotificationMail({ to: input.email, subject: 'Confirm your Auronix Commerce newsletter subscription', html, text: `Confirm your Auronix Commerce newsletter subscription:\n${url}\n\nThis link expires on ${expiry}. If you did not request this, no action is required.` });
+}
+
+export async function sendAdminMfaCodeEmail(input: { email: string; code: string; expiresAt: number; device?: string }) {
+  const expiry = new Date(input.expiresAt).toLocaleTimeString('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
+  const html = emailShell({ preheader: `${input.code} is your Auronix Admin security code.`, title: 'Admin sign-in verification', footerNote: 'This code protects administrative access. Never share it with anyone, including Auronix support.', body: `<h1 style="margin:0 0 16px;font-size:27px;line-height:1.2">Verify admin sign-in</h1><p>Enter this one-time code to continue signing in${input.device ? ` from <strong>${escapeHtml(input.device)}</strong>` : ''}:</p><div style="margin:24px 0;padding:18px;border-radius:14px;background:#f3f4f6;text-align:center;font-size:32px;font-weight:800;letter-spacing:.22em">${escapeHtml(input.code)}</div><p>The code expires at <strong>${escapeHtml(expiry)} UTC</strong>.</p>` });
+  return sendNotificationMail({ to: input.email, subject: `${input.code} — Auronix Admin security code`, html, text: `Your Auronix Admin security code is ${input.code}. It expires at ${expiry} UTC. Never share this code.` });
 }
 
 export async function sendTicketResponseEmail(input: any, positionalSubject?: string, positionalMessage?: string) {

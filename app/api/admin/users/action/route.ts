@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase-admin';
 import { requireAdmin } from '@/lib/server-auth';
+import { writeAuditLog } from '@/lib/server-audit';
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +29,8 @@ export async function POST(request: Request) {
     }
 
     const userRecord = await adminAuth.getUser(uid);
+
+    await writeAuditLog({ actorUid: admin.uid, actorEmail: admin.email || '', action: `ADMIN_USER_${action.toUpperCase().replace(/-/g, '_')}_REQUESTED`, targetType: 'user', targetId: uid, summary: `Admin requested ${action} for ${userRecord.email || uid}.`, request });
 
     switch (action) {
       case 'temporary-ban': {

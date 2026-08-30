@@ -18,6 +18,9 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
 
   const router = useRouter();
 
@@ -29,20 +32,25 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
+      if (mfaRequired) {
+        const token = await auth.currentUser?.getIdToken();
+        const response = await fetch('/api/admin/mfa/verify', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` }, body: JSON.stringify({ code: mfaCode, device: `${navigator.platform || 'Browser'} · ${navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'}` }) });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to verify security code.');
+        toast({ title: 'Security verified', description: 'Your protected admin session is ready.' });
+        router.push('/admin');
+        return;
+      }
+
       const result = await signInWithEmailAndPassword(
         auth,
         email.trim(),
         password
       );
 
-      console.log('Firebase Auth UID:', result.user.uid);
-      console.log('Firebase Auth email:', result.user.email);
-
       const profile = await getData<UserProfile>(
         `users/${result.user.uid}`
       );
-
-      console.log('Admin profile from RTDB:', profile);
 
       if (!profile) {
         await auth.signOut();
@@ -66,6 +74,18 @@ export default function AdminLoginPage() {
           variant: 'destructive',
         });
 
+        setLoading(false);
+        return;
+      }
+
+      const token = await result.user.getIdToken();
+      const mfaResponse = await fetch('/api/admin/mfa/request', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ device: `${navigator.platform || 'Browser'} · ${navigator.userAgent.includes('Mobile') ? 'Mobile' : 'Desktop'}` }) });
+      const mfaData = await mfaResponse.json();
+      if (!mfaResponse.ok) throw new Error(mfaData.error || 'Unable to start admin security verification.');
+      if (mfaData.required) {
+        setMfaRequired(true);
+        setMaskedEmail(mfaData.emailMasked || result.user.email || 'your admin email');
+        toast({ title: 'Security code sent', description: 'Enter the code to continue.' });
         setLoading(false);
         return;
       }
@@ -154,7 +174,7 @@ export default function AdminLoginPage() {
           </h1>
 
           <p className="text-sm text-foreground-muted">
-            Sign in to the admin dashboard.
+            {mfaRequired ? `Enter the security code sent to ${maskedEmail}.` : 'Sign in to the admin dashboard.'}
           </p>
         </div>
 
@@ -162,7 +182,7 @@ export default function AdminLoginPage() {
           onSubmit={handleSubmit}
           className="space-y-5 rounded-2xl border border-border bg-card p-8"
         >
-          <div>
+          {!mfaRequired && <div>
             <Label
               htmlFor="email"
               className="mb-2 block"
@@ -179,9 +199,9 @@ export default function AdminLoginPage() {
               autoComplete="email"
               placeholder="admin@example.com"
             />
-          </div>
+          </div>}
 
-          <div>
+          {!mfaRequired && <div>
             <Label
               htmlFor="password"
               className="mb-2 block"
@@ -198,22 +218,24 @@ export default function AdminLoginPage() {
               autoComplete="current-password"
               placeholder="••••••••"
             />
-          </div>
+          </div>}
+
+          {mfaRequired && <div><Label htmlFor="mfaCode" className="mb-2 block">Six-digit security code</Label><Input id="mfaCode" value={mfaCode} onChange={(event) => setMfaCode(event.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" className="text-center text-xl font-bold tracking-[0.28em]" required /></div>}
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || (mfaRequired && mfaCode.length !== 6)}
             className="w-full"
             size="lg"
           >
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Signing in…
+                {mfaRequired ? 'Verifying…' : 'Signing in…'}
               </>
             ) : (
               <>
-                Sign In
+                {mfaRequired ? 'Verify and continue' : 'Sign In'}
                 <ArrowRight className="w-4 h-4 ml-2" />
               </>
             )}

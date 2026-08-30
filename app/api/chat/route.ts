@@ -17,6 +17,7 @@ import {
   buildSiteKnowledgeText,
   getPageKnowledge,
 } from '@/lib/ai-site-knowledge';
+import { protectPublicRequest, publicRequestErrorResponse } from '@/lib/server-protection';
 
 export const runtime = 'nodejs';
 
@@ -67,6 +68,8 @@ export async function POST(
   try {
     const body =
       await request.json();
+
+    await protectPublicRequest(request, 'public-ai-chat', body, { limit: 30, windowMs: 15 * 60_000 });
 
     const pathname =
       safeString(
@@ -523,6 +526,8 @@ Never expose API keys, Firebase credentials, admin internals, private records or
   } catch (
     error
   ) {
+    const protectedError = publicRequestErrorResponse(error);
+    if (protectedError) return NextResponse.json(protectedError.body, { status: protectedError.status });
     console.error(
       '[Auronix AI]',
       error

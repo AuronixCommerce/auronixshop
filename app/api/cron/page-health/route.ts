@@ -1,6 +1,7 @@
 ﻿import { NextResponse } from 'next/server';
 
 import { adminDb } from '@/lib/firebase-admin';
+import { reportOperationalError } from '@/lib/server-audit';
 
 import { generateGroqResponse } from '@/lib/server-groq';
 
@@ -476,6 +477,8 @@ async function main() {
           });
 
         maintenanceCount += 1;
+
+        await reportOperationalError('page-health-incident', new Error(ai.reason || errorText || `HTTP ${status}`), { path: page.path, status, consecutiveFailures, automaticMaintenance: true });
 
         continue;
       }

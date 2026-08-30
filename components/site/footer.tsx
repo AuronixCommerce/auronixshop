@@ -148,6 +148,7 @@ export function Footer() {
         | {
             success?: boolean;
             alreadySubscribed?: boolean;
+            confirmationRequired?: boolean;
             error?: string;
           }
         | null =
@@ -194,7 +195,9 @@ export function Footer() {
       setMessage(
         data.alreadySubscribed
           ? 'You are already subscribed.'
-          : 'You are now subscribed to Auronix Commerce updates.'
+          : data.confirmationRequired
+            ? 'Check your email and confirm your subscription.'
+            : 'You are now subscribed to Auronix Commerce updates.'
       );
 
       setEmail(
@@ -385,6 +388,10 @@ export function Footer() {
               >
                 Cookie Policy
               </Link>
+
+              <button type="button" onClick={() => window.dispatchEvent(new Event('auronix:open-cookie-settings'))} className="block text-left hover:text-foreground">
+                Cookie Settings
+              </button>
 
               <Link
                 href="/seller/policy"
