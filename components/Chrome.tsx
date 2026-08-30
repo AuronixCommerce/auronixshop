@@ -40,7 +40,7 @@ export function Header() {
             <Link href="/how-it-works">How It Works</Link>
             <Link href="/guides">Guides</Link>
             <Link href="/contact">Contact</Link>
-            <a className="officialLink" href="https://auronixcommerce.com" target="_blank" rel="noopener noreferrer">AuronixCommerce.com</a>
+            <Link className="officialLink" href="/auronix-commerce">Auronix Commerce ↗</Link>
           </div>
         </nav>
       </header>
@@ -62,6 +62,7 @@ export function Footer() {
             <Link href="/categories">Categories</Link>
             <Link href="/contact">Contact</Link>
             <Link href="/guides">Guides</Link>
+            <Link href="/auronix-commerce">Official Auronix pages</Link>
           </div>
         </div>
         <div>
