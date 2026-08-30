@@ -7,7 +7,7 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { get, push, ref, remove, set } from "firebase/database";
+import { get, push, ref, remove, set, update } from "firebase/database";
 import { auth, db, firebaseConfigured } from "@/lib/firebase";
 import { useCatalog } from "@/lib/catalog";
 import { blankProduct, type Product } from "@/lib/types";
@@ -154,6 +154,22 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
     window.scrollTo({ top: 0, behavior: "smooth" });
     setMessage(`Editing “${p.title}”. Make changes and choose Save product.`);
   };
+  const smartSort = async () => {
+    if (!db || !products.length) return;
+    setMessage("Smart sorting the catalog…");
+    const ranked = [...products].sort((a, b) => {
+      const score = (p: Product) => Number(p.featured) * 100 + (p.rating || 0) * 8 + Number(Boolean(p.oldPrice)) * 12 + Math.min((p.bullets || []).length, 6) * 2 + Number(Boolean(p.description)) * 5;
+      return score(b) - score(a) || b.updatedAt - a.updatedAt;
+    });
+    const changes: Record<string, number> = {};
+    ranked.forEach((product, index) => { changes[`affiliateShop/products/${product.id}/sortOrder`] = index + 1; });
+    try {
+      await update(ref(db), changes);
+      setMessage("Smart sorting completed. Featured, detailed and highly rated products now appear first.");
+    } catch {
+      setMessage("Smart sorting could not be saved. Check Firebase admin rules.");
+    }
+  };
   return (
     <div className="admin">
       <div className="adminTop">
@@ -177,7 +193,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
       <main className="wrap adminMain">
-        <h1>Affiliate catalog</h1>
+        <div className="adminHeading"><div className="eyebrow">Private administration</div><h1>Build your Amazon product listing</h1><p>Enter the product facts and links below. Auronix builds the storefront page; customers complete purchases on Amazon.</p></div>
         <AdminAI form={form} setForm={setForm} />
         <div className="stats">
           {[
@@ -197,11 +213,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         </div>
         <div className="adminGrid">
           <form className="panel" onSubmit={save}>
-            <h2>{form.id ? "Edit product" : "Add product"}</h2>
+            <h2>{form.id ? "Edit product" : "Add a new product"}</h2>
+            <p className="formHelp">Enter the name, price, description, Amazon link and picture links. Fields marked * are required.</p>
             {message && <p className="notice">{message}</p>}
             <div className="formGrid">
               <Field
-                label="Product title *"
+                label="1. Product name *"
                 value={form.title}
                 onChange={(v) => {
                   change("title", v);
@@ -247,7 +264,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 </select>
               </label>
               <Field
-                label="Current price"
+                label="2. Product price"
                 type="number"
                 value={form.price ?? ""}
                 onChange={(v) => change("price", v)}
@@ -275,12 +292,13 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 onChange={(v) => change("discountLabel", v)}
               />
               <Field
-                label="Main image URL *"
+                label="3. Main picture link *"
                 value={form.mainImageUrl}
                 onChange={(v) => change("mainImageUrl", v)}
               />
+              {form.mainImageUrl && <div className="imagePreview"><span>Main picture preview</span><img src={form.mainImageUrl} alt="Product preview" onError={(event) => { event.currentTarget.style.display = "none"; }}/></div>}
               <Field
-                label="Amazon affiliate URL *"
+                label="4. Amazon affiliate link *"
                 value={form.amazonUrl}
                 onChange={(v) => change("amazonUrl", v)}
               />
@@ -306,17 +324,17 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 onChange={(v) => change("ratingCount", v)}
               />
               <Area
-                label="Short description"
+                label="5. Short description"
                 value={form.shortDescription}
                 onChange={(v) => change("shortDescription", v)}
               />
               <Area
-                label="Full description"
+                label="6. Full product details"
                 value={form.description}
                 onChange={(v) => change("description", v)}
               />
               <Area
-                label="Gallery URLs — one per line"
+                label="7. Extra picture links — one per line"
                 value={form.galleryImageUrls.join("\n")}
                 onChange={(v) =>
                   change("galleryImageUrls", v.split("\n").filter(Boolean))
@@ -363,7 +381,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 />{" "}
                 Featured
               </label>
-              <button className="adminBtn">Save product</button>
+              <button className="adminBtn">{form.status === "published" ? "Save and publish product" : "Save product"}</button>
               {form.id && (
                 <button type="button" onClick={() => setForm(blankProduct())}>
                   Cancel
@@ -415,7 +433,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
               ))}
             </div>
             <div className="panel" style={{ marginTop: 20 }}>
-              <h2>Products</h2>
+              <div className="productListHead"><div><h2>Products</h2><small>Use Edit to change any listing.</small></div><button type="button" className="adminBtn" onClick={smartSort}>Smart-sort catalog</button></div>
               {products
                 .sort((a, b) => b.updatedAt - a.updatedAt)
                 .map((p) => (
