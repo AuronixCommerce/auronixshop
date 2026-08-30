@@ -16,6 +16,17 @@ type Draft = ReturnType<typeof blankProduct> & {
   id?: string;
   createdAt?: number;
 };
+function editableProduct(p: Product): Draft {
+  return {
+    ...blankProduct(),
+    ...p,
+    galleryImageUrls: Array.isArray(p.galleryImageUrls) ? p.galleryImageUrls : [],
+    bullets: Array.isArray(p.bullets) ? p.bullets : [],
+    badges: Array.isArray(p.badges) ? p.badges : [],
+    tags: Array.isArray(p.tags) ? p.tags : [],
+    specifications: p.specifications && typeof p.specifications === "object" ? p.specifications : {},
+  };
+}
 export default function Admin() {
   const [user, setUser] = useState<User | null | undefined>(),
     [allowed, setAllowed] = useState(false),
@@ -119,20 +130,27 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         form.oldPrice === undefined || String(form.oldPrice) === ""
           ? null
           : Number(form.oldPrice);
-    await set(target, {
-      ...form,
-      id: null,
-      createdAt: form.createdAt || now,
-      updatedAt: now,
-      price,
-      oldPrice,
-    });
-    setForm(blankProduct());
-    setMessage("Product saved successfully.");
+    try {
+      const { id: _id, ...productData } = form;
+      await set(target, {
+        ...productData,
+        createdAt: form.createdAt || now,
+        updatedAt: now,
+        price,
+        oldPrice,
+      });
+      const wasEditing = Boolean(form.id);
+      setForm(blankProduct());
+      setMessage(wasEditing ? "Product updated successfully." : "Product created successfully.");
+    } catch (error) {
+      console.error(error);
+      setMessage("Firebase rejected the save. Check the admin database rules and try again.");
+    }
   };
   const edit = (p: Product) => {
-    setForm(p);
-    scrollTo({ top: 0, behavior: "smooth" });
+    setForm(editableProduct(p));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    setMessage(`Editing “${p.title}”. Make changes and choose Save product.`);
   };
   return (
     <div className="admin">
@@ -399,8 +417,8 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                       <b>{p.title}</b>
                       <small style={{ display: "block" }}>{p.status}</small>
                     </span>
-                    <button onClick={() => edit(p)}>Edit</button>
-                    <button
+                    <button type="button" onClick={() => edit(p)}>Edit</button>
+                    <button type="button"
                       onClick={() =>
                         confirm(`Delete ${p.title}?`) &&
                         db &&
