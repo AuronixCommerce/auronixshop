@@ -130,6 +130,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         form.oldPrice === undefined || String(form.oldPrice) === ""
           ? null
           : Number(form.oldPrice);
+    const sortOrder = Number(form.sortOrder) || 0;
     try {
       const { id: _id, ...productData } = form;
       await set(target, {
@@ -138,6 +139,7 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
         updatedAt: now,
         price,
         oldPrice,
+        sortOrder,
       });
       const wasEditing = Boolean(form.id);
       setForm(blankProduct());
@@ -255,6 +257,12 @@ function Dashboard({ onLogout }: { onLogout: () => void }) {
                 type="number"
                 value={form.oldPrice ?? ""}
                 onChange={(v) => change("oldPrice", v)}
+              />
+              <Field
+                label="Display priority (lower appears first)"
+                type="number"
+                value={form.sortOrder ?? 0}
+                onChange={(v) => change("sortOrder", v)}
               />
               <Field
                 label="Currency"

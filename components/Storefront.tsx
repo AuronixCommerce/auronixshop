@@ -11,7 +11,8 @@ import {
 import { useCatalog } from "@/lib/catalog";
 import { money, type Product } from "@/lib/types";
 import { Footer, Header } from "./Chrome";
-export function Storefront() {
+import { SmartFinder } from "./SmartFinder";
+export function Storefront({ homepage = false }: { homepage?: boolean }) {
   const { products, categories, loading, error } = useCatalog(),
     [category, setCategory] = useState(""),
     [brand, setBrand] = useState(""),
@@ -40,7 +41,9 @@ export function Storefront() {
                 ? (b.price ?? -1) - (a.price ?? -1)
                 : sort === "rating"
                   ? (b.rating ?? 0) - (a.rating ?? 0)
-                  : Number(b.featured) - Number(a.featured),
+                  : Number(b.featured) - Number(a.featured) ||
+                    (a.sortOrder ?? 999) - (b.sortOrder ?? 999) ||
+                    b.createdAt - a.createdAt,
         ),
     [products, category, brand, sort],
   );
@@ -80,6 +83,29 @@ export function Storefront() {
             </div>
           </div>
         </section>
+        {homepage && (
+          <>
+            <section className="featureRibbon">
+              <div className="wrap featureRibbonGrid">
+                <div><strong>Smart discovery</strong><span>Search by need, category or budget</span></div>
+                <div><strong>Detailed comparisons</strong><span>Prices, features and specifications</span></div>
+                <div><strong>Curated catalog</strong><span>Listings managed from one secure admin</span></div>
+                <div><strong>Amazon checkout</strong><span>Complete purchases with Amazon</span></div>
+              </div>
+            </section>
+            <SmartFinder compact />
+            <section className="section discoveryLinks">
+              <div className="wrap">
+                <div className="sectionHead"><div><div className="eyebrow">Explore deeper</div><h2>Everything you need before choosing</h2></div></div>
+                <div className="discoveryGrid">
+                  <Link href="/categories"><b>Shop by category</b><span>Navigate the complete catalog by product family.</span><ArrowRight /></Link>
+                  <Link href="/guides"><b>Buying guides</b><span>Learn what matters before comparing products.</span><ArrowRight /></Link>
+                  <Link href="/how-it-works"><b>How Auronix works</b><span>Understand discovery, affiliate links and Amazon checkout.</span><ArrowRight /></Link>
+                </div>
+              </div>
+            </section>
+          </>
+        )}
         <section className="section" id="catalog">
           <div className="wrap">
             <div className="sectionHead">
@@ -154,7 +180,9 @@ export function Storefront() {
                     <option value="rating">Rating</option>
                   </select>
                 </div>
-                {!loading && shown.length === 0 ? (
+                {loading ? (
+                  <LoadingGrid />
+                ) : shown.length === 0 ? (
                   <div className="empty">
                     <h3>No products match this selection</h3>
                     <p>Try another category, brand, or sorting option.</p>
@@ -198,6 +226,11 @@ export function Storefront() {
       <Footer />
     </>
   );
+}
+function LoadingGrid() {
+  return <div className="products" aria-label="Loading products" aria-busy="true">
+    {Array.from({ length: 8 }).map((_, i) => <div className="card skeletonCard" key={i}><div className="skeleton skeletonPhoto"/><div className="skeleton skeletonLine short"/><div className="skeleton skeletonLine"/><div className="skeleton skeletonLine medium"/><div className="skeleton skeletonButton"/></div>)}
+  </div>;
 }
 function Filter({
   title,

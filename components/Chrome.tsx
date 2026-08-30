@@ -19,7 +19,7 @@ export function Header() {
               AURONIX<small>COMMERCE SHOP</small>
             </span>
           </Link>
-          <form className="search" action="/">
+          <form className="search" action="/smart-finder">
             <input
               name="q"
               value={q}
@@ -33,8 +33,9 @@ export function Header() {
         </div>
         <nav className="nav">
           <div className="wrap navin">
-            <Link href="/#catalog">Shop</Link>
+            <Link href="/shop">Shop</Link>
             <Link href="/categories">Categories</Link>
+            <Link href="/smart-finder">Smart Finder</Link>
             <Link href="/about">About Us</Link>
             <Link href="/how-it-works">How It Works</Link>
             <Link href="/guides">Guides</Link>
