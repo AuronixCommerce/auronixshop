@@ -53,17 +53,17 @@ export function Storefront() {
             <div>
               <div className="eyebrow">Curated by Auronix Commerce</div>
               <h1>
-                A real shop.
+                Discover well.
                 <br />
-                Powered by Amazon.
+                Decide confidently.
               </h1>
               <p>
                 Explore a carefully managed catalog with full product details,
-                useful filters and clear pricing—then complete your purchase
-                securely on Amazon.
+                useful filters and clear information—then complete your
+                purchase securely on Amazon.
               </p>
               <a className="cta" href="#catalog">
-                Shop now <ArrowRight size={19} />
+                Explore the collection <ArrowRight size={19} />
               </a>
             </div>
             <div className="trust">

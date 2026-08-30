@@ -7,8 +7,7 @@ export function Header() {
   return (
     <>
       <div className="utility">
-        Amazon affiliate storefront · Auronix Commerce may earn from qualifying
-        purchases
+        Curated product discovery · Purchases are completed on Amazon
       </div>
       <header className="header">
         <div className="wrap head">
