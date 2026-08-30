@@ -97,8 +97,8 @@ export function Storefront() {
             </div>
             {error && (
               <div className="error">
-                {error} The storefront remains online; check the Firebase
-                environment variables and database read rules.
+                The product catalog is temporarily unavailable. Please return
+                shortly or continue to our shopping guides.
               </div>
             )}
             <div className="shopGrid">
@@ -156,11 +156,8 @@ export function Storefront() {
                 </div>
                 {!loading && shown.length === 0 ? (
                   <div className="empty">
-                    <h3>No published products yet</h3>
-                    <p>
-                      Add products from the protected admin area and publish
-                      them when ready.
-                    </p>
+                    <h3>No products match this selection</h3>
+                    <p>Try another category, brand, or sorting option.</p>
                   </div>
                 ) : (
                   <div className="products">

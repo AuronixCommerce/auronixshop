@@ -38,8 +38,9 @@ export function Header() {
             <Link href="/categories">Categories</Link>
             <Link href="/about">About Us</Link>
             <Link href="/how-it-works">How It Works</Link>
+            <Link href="/guides">Guides</Link>
             <Link href="/contact">Contact</Link>
-            <Link href="/affiliate-disclosure">Affiliate Disclosure</Link>
+            <a className="officialLink" href="https://auronixcommerce.com" target="_blank" rel="noopener noreferrer">AuronixCommerce.com</a>
           </div>
         </nav>
       </header>
@@ -60,6 +61,7 @@ export function Footer() {
             <Link href="/about">About</Link>
             <Link href="/categories">Categories</Link>
             <Link href="/contact">Contact</Link>
+            <Link href="/guides">Guides</Link>
           </div>
         </div>
         <div>
@@ -73,6 +75,8 @@ export function Footer() {
             <Link href="/affiliate-disclosure">Disclosure</Link>
             <Link href="/privacy">Privacy</Link>
             <Link href="/terms">Terms</Link>
+            <Link href="/info/accessibility">Accessibility</Link>
+            <a href="https://auronixcommerce.com" target="_blank" rel="noopener noreferrer">Official website</a>
           </div>
         </div>
       </div>
