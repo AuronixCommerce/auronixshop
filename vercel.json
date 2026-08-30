@@ -1,13 +1,1 @@
-{
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "installCommand": "npm ci",
-  "buildCommand": "npm run build",
-  "env": {
-    "SHOP_PRIMARY_HOST": "true"
-  },
-  "crons": [
-    { "path": "/api/cron/page-health", "schedule": "0 3 * * *" },
-    { "path": "/api/cron/security-maintenance", "schedule": "15 2 * * *" }
-  ]
-}
+{"$schema":"https://openapi.vercel.sh/vercel.json","framework":"nextjs","installCommand":"npm ci","buildCommand":"npm run build"}
