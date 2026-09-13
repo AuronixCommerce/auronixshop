@@ -3,7 +3,7 @@ import { useState } from "react";
 import { auth } from "@/lib/firebase";
 import type { Product } from "@/lib/types";
 type Draft = Omit<Product, "id" | "createdAt" | "updatedAt"> & { id?: string; createdAt?: number };
-export function AdminAI({ form, setForm }: { form: Draft; setForm: React.Dispatch<React.SetStateAction<Draft>> }) {
+export function AdminAI({ form, setForm }: { form: Draft; setForm: (value: Draft) => void }) {
   const [brief, setBrief] = useState(""), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const generate = async () => {
     setBusy(true); setMessage("Groq is preparing your product listing…");
@@ -15,7 +15,7 @@ export function AdminAI({ form, setForm }: { form: Draft; setForm: React.Dispatc
       if (!contentType.includes("application/json")) throw new Error(response.ok ? "The AI service returned an invalid response." : "The AI route is unavailable. Redeploy after adding GROQ_API_KEY.");
       let data: any; try { data = JSON.parse(raw); } catch { throw new Error("The AI service returned malformed data. Please try again."); }
       if (!response.ok) throw new Error(data.error || `AI request failed (${response.status}).`);
-      setForm((current) => ({ ...current, shortDescription: data.shortDescription || current.shortDescription, description: data.description || current.description, bullets: Array.isArray(data.bullets) ? data.bullets : current.bullets, tags: Array.isArray(data.tags) ? data.tags : current.tags, seoTitle: data.seoTitle || current.seoTitle, seoDescription: data.seoDescription || current.seoDescription }));
+      setForm({ ...form, shortDescription: data.shortDescription || form.shortDescription, description: data.description || form.description, bullets: Array.isArray(data.bullets) ? data.bullets : form.bullets, tags: Array.isArray(data.tags) ? data.tags : form.tags, seoTitle: data.seoTitle || form.seoTitle, seoDescription: data.seoDescription || form.seoDescription });
       setMessage("AI listing applied below. Add your price, Amazon link and picture links, review everything, then publish.");
     } catch (error: any) { setMessage(error.message || "AI generation failed."); } finally { setBusy(false); }
   };

@@ -1,507 +1,72 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  type User,
-} from "firebase/auth";
+import { useEffect, useMemo, useState } from "react";
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut, type User } from "firebase/auth";
 import { get, push, ref, remove, set, update } from "firebase/database";
+import { Activity, ArrowUpRight, BarChart3, Boxes, CheckCircle2, Copy, Download, Edit3, ExternalLink, FolderTree, LayoutDashboard, LogOut, Menu, PackagePlus, Search, Settings, Sparkles, Trash2, X } from "lucide-react";
 import { auth, db, firebaseConfigured } from "@/lib/firebase";
 import { useCatalog } from "@/lib/catalog";
-import { blankProduct, type Product } from "@/lib/types";
+import { blankProduct, money, type Product } from "@/lib/types";
 import { AdminAI } from "@/components/AdminAI";
-type Draft = ReturnType<typeof blankProduct> & {
-  id?: string;
-  createdAt?: number;
-};
-function editableProduct(p: Product): Draft {
-  return {
-    ...blankProduct(),
-    ...p,
-    galleryImageUrls: Array.isArray(p.galleryImageUrls) ? p.galleryImageUrls : [],
-    bullets: Array.isArray(p.bullets) ? p.bullets : [],
-    badges: Array.isArray(p.badges) ? p.badges : [],
-    tags: Array.isArray(p.tags) ? p.tags : [],
-    specifications: p.specifications && typeof p.specifications === "object" ? p.specifications : {},
-  };
+
+type Draft=ReturnType<typeof blankProduct>&{id?:string;createdAt?:number};
+type Screen="overview"|"products"|"editor"|"categories";
+const editable=(p:Product):Draft=>({...blankProduct(),...p,galleryImageUrls:Array.isArray(p.galleryImageUrls)?p.galleryImageUrls:[],bullets:Array.isArray(p.bullets)?p.bullets:[],badges:Array.isArray(p.badges)?p.badges:[],tags:Array.isArray(p.tags)?p.tags:[],specifications:p.specifications&&typeof p.specifications==="object"?p.specifications:{}});
+
+export default function Admin(){
+  const[user,setUser]=useState<User|null|undefined>();const[allowed,setAllowed]=useState(false);const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[message,setMessage]=useState("");
+  useEffect(()=>{if(!auth){setUser(null);return}return onAuthStateChanged(auth,async u=>{setUser(u);if(!u||!db){setAllowed(false);return}const role=(await get(ref(db,`users/${u.uid}/role`))).val();setAllowed(role==="admin");if(role!=="admin")setMessage("This account does not have Auronix Admin access.")})},[]);
+  if(!firebaseConfigured)return <AdminLogin title="Store connection required" message="The secure store connection is missing from this deployment. Add the required environment settings, then redeploy."/>;
+  if(user===undefined)return <AdminLogin title="Opening Auronix Admin" message="Verifying your secure session…" loading/>;
+  if(!user||!allowed)return <div className="adminLogin">
+    <div className="loginGlow"/>
+    <form onSubmit={async e=>{e.preventDefault();setMessage("Signing in securely…");try{if(auth)await signInWithEmailAndPassword(auth,email,password)}catch{setMessage("The email or password is incorrect.")}}}>
+      <div className="adminLoginBrand"><span>A</span><div><b>AURONIX</b><small>SHOP OPERATIONS</small></div></div>
+      <div className="securePill">SECURE ADMINISTRATOR ACCESS</div><h1>Welcome back.</h1>
+      <p>Manage the catalog, publishing, categories and storefront quality from one workspace.</p>
+      <label>Email address<input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="admin@auronixcommerce.com" required/></label>
+      <label>Password<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="••••••••" required/></label>
+      <button className="loginSubmit">Sign in to dashboard <ArrowUpRight/></button>
+      {message&&<div className="loginMessage">{message}</div>}<Link href="/">← Return to store</Link>
+    </form>
+  </div>;
+  return <Dashboard email={user.email||"Administrator"} onLogout={()=>auth&&signOut(auth)}/>;
 }
-export default function Admin() {
-  const [user, setUser] = useState<User | null | undefined>(),
-    [allowed, setAllowed] = useState(false),
-    [email, setEmail] = useState(""),
-    [password, setPassword] = useState(""),
-    [message, setMessage] = useState("");
-  useEffect(() => {
-    if (!auth) {
-      setUser(null);
-      return;
-    }
-    return onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (!u || !db) {
-        setAllowed(false);
-        return;
-      }
-      const role = (await get(ref(db, `users/${u.uid}/role`))).val();
-      setAllowed(role === "admin");
-      if (role !== "admin")
-        setMessage("This account does not have Auronix admin access.");
-    });
-  }, []);
-  if (!firebaseConfigured)
-    return (
-      <div className="login">
-        <div className="loginCard">
-          <h1>Store configuration required</h1>
-          <p>
-            Add the seven NEXT_PUBLIC_FIREBASE_* variables in Vercel. The public
-            site will remain online instead of returning a 500.
-          </p>
-        </div>
-      </div>
-    );
-  if (!user || !allowed)
-    return (
-      <div className="login">
-        <form
-          className="loginCard"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setMessage("Signing in…");
-            try {
-              if (auth) await signInWithEmailAndPassword(auth, email, password);
-            } catch {
-              setMessage("Email or password is incorrect.");
-            }
-          }}
-        >
-          <h1>Auronix Shop Admin</h1>
-          <p>Use the existing Auronix administrator account.</p>
-          <input
-            type="email"
-            placeholder="Admin email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-          <button className="adminBtn">Sign in</button>
-          {message && <p>{message}</p>}
-        </form>
-      </div>
-    );
-  return <Dashboard onLogout={() => auth && signOut(auth)} />;
-}
-function Dashboard({ onLogout }: { onLogout: () => void }) {
-  const { products, categories } = useCatalog(true),
-    [form, setForm] = useState<Draft>(blankProduct()),
-    [categoryName, setCategoryName] = useState(""),
-    [message, setMessage] = useState("");
-  const change = (k: keyof Draft, v: any) => setForm((x) => ({ ...x, [k]: v }));
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!db) return;
-    try {
-      const a = new URL(form.amazonUrl),
-        i = new URL(form.mainImageUrl);
-      if (a.protocol !== "https:" || i.protocol !== "https:") throw new Error();
-    } catch {
-      return setMessage("Image and Amazon URLs must be complete HTTPS URLs.");
-    }
-    if (!form.title || !form.slug || !form.categoryId)
-      return setMessage("Title, slug and category are required.");
-    const now = Date.now(),
-      target = form.id
-        ? ref(db, `affiliateShop/products/${form.id}`)
-        : push(ref(db, "affiliateShop/products")),
-      price =
-        form.price === undefined || String(form.price) === ""
-          ? null
-          : Number(form.price),
-      oldPrice =
-        form.oldPrice === undefined || String(form.oldPrice) === ""
-          ? null
-          : Number(form.oldPrice);
-    const sortOrder = Number(form.sortOrder) || 0;
-    try {
-      const { id: _id, ...productData } = form;
-      await set(target, {
-        ...productData,
-        createdAt: form.createdAt || now,
-        updatedAt: now,
-        price,
-        oldPrice,
-        sortOrder,
-      });
-      const wasEditing = Boolean(form.id);
-      setForm(blankProduct());
-      setMessage(wasEditing ? "Product updated successfully." : "Product created successfully.");
-    } catch (error) {
-      console.error(error);
-      setMessage("Firebase rejected the save. Check the admin database rules and try again.");
-    }
-  };
-  const edit = (p: Product) => {
-    setForm(editableProduct(p));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    setMessage(`Editing “${p.title}”. Make changes and choose Save product.`);
-  };
-  const smartSort = async () => {
-    if (!db || !products.length) return;
-    setMessage("Smart sorting the catalog…");
-    const ranked = [...products].sort((a, b) => {
-      const score = (p: Product) => Number(p.featured) * 100 + (p.rating || 0) * 8 + Number(Boolean(p.oldPrice)) * 12 + Math.min((p.bullets || []).length, 6) * 2 + Number(Boolean(p.description)) * 5;
-      return score(b) - score(a) || b.updatedAt - a.updatedAt;
-    });
-    const changes: Record<string, number> = {};
-    ranked.forEach((product, index) => { changes[`affiliateShop/products/${product.id}/sortOrder`] = index + 1; });
-    try {
-      await update(ref(db), changes);
-      setMessage("Smart sorting completed. Featured, detailed and highly rated products now appear first.");
-    } catch {
-      setMessage("Smart sorting could not be saved. Check Firebase admin rules.");
-    }
-  };
-  return (
-    <div className="admin">
-      <div className="adminTop">
-        <div
-          className="wrap"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <b>AURONIX SHOP ADMIN</b>
-          <div>
-            <Link href="/" target="_blank" style={{ marginRight: 20 }}>
-              View store
-            </Link>
-            <button className="adminBtn" onClick={onLogout}>
-              Sign out
-            </button>
-          </div>
-        </div>
-      </div>
-      <main className="wrap adminMain">
-        <div className="adminHeading"><div className="eyebrow">Private administration</div><h1>Build your Amazon product listing</h1><p>Enter the product facts and links below. Auronix builds the storefront page; customers complete purchases on Amazon.</p></div>
-        <AdminAI form={form} setForm={setForm} />
-        <div className="stats">
-          {[
-            ["Products", products.length],
-            [
-              "Published",
-              products.filter((p) => p.status === "published").length,
-            ],
-            ["Drafts", products.filter((p) => p.status === "draft").length],
-            ["Categories", categories.length],
-          ].map(([x, n]) => (
-            <div className="stat" key={x}>
-              <span>{x}</span>
-              <b>{n}</b>
-            </div>
-          ))}
-        </div>
-        <div className="adminGrid">
-          <form className="panel" onSubmit={save}>
-            <h2>{form.id ? "Edit product" : "Add a new product"}</h2>
-            <p className="formHelp">Enter the name, price, description, Amazon link and picture links. Fields marked * are required.</p>
-            {message && <p className="notice">{message}</p>}
-            <div className="formGrid">
-              <Field
-                label="1. Product name *"
-                value={form.title}
-                onChange={(v) => {
-                  change("title", v);
-                  if (!form.id)
-                    change(
-                      "slug",
-                      v
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-")
-                        .replace(/^-|-$/g, ""),
-                    );
-                }}
-              />
-              <Field
-                label="Slug *"
-                value={form.slug}
-                onChange={(v) => change("slug", v)}
-              />
-              <Field
-                label="Brand"
-                value={form.brand}
-                onChange={(v) => change("brand", v)}
-              />
-              <label className="field">
-                Category *
-                <select
-                  value={form.categoryId}
-                  onChange={(e) => {
-                    const c = categories.find((x) => x.id === e.target.value);
-                    setForm((x) => ({
-                      ...x,
-                      categoryId: e.target.value,
-                      category: c?.name || "",
-                    }));
-                  }}
-                >
-                  <option value="">Select category</option>
-                  {categories.map((c) => (
-                    <option value={c.id} key={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <Field
-                label="2. Product price"
-                type="number"
-                value={form.price ?? ""}
-                onChange={(v) => change("price", v)}
-              />
-              <Field
-                label="Old price"
-                type="number"
-                value={form.oldPrice ?? ""}
-                onChange={(v) => change("oldPrice", v)}
-              />
-              <Field
-                label="Display priority (lower appears first)"
-                type="number"
-                value={form.sortOrder ?? 0}
-                onChange={(v) => change("sortOrder", v)}
-              />
-              <Field
-                label="Currency"
-                value={form.currency}
-                onChange={(v) => change("currency", v)}
-              />
-              <Field
-                label="Discount label"
-                value={form.discountLabel || ""}
-                onChange={(v) => change("discountLabel", v)}
-              />
-              <Field
-                label="3. Main picture link *"
-                value={form.mainImageUrl}
-                onChange={(v) => change("mainImageUrl", v)}
-              />
-              {form.mainImageUrl && <div className="imagePreview"><span>Main picture preview</span><img src={form.mainImageUrl} alt="Product preview" onError={(event) => { event.currentTarget.style.display = "none"; }}/></div>}
-              <Field
-                label="4. Amazon affiliate link *"
-                value={form.amazonUrl}
-                onChange={(v) => change("amazonUrl", v)}
-              />
-              <Field
-                label="ASIN / SKU"
-                value={form.asin || ""}
-                onChange={(v) => change("asin", v)}
-              />
-              <Field
-                label="Availability"
-                value={form.availability || ""}
-                onChange={(v) => change("availability", v)}
-              />
-              <Field
-                label="Rating"
-                type="number"
-                value={form.rating ?? ""}
-                onChange={(v) => change("rating", v)}
-              />
-              <Field
-                label="Rating count"
-                value={form.ratingCount || ""}
-                onChange={(v) => change("ratingCount", v)}
-              />
-              <Area
-                label="5. Short description"
-                value={form.shortDescription}
-                onChange={(v) => change("shortDescription", v)}
-              />
-              <Area
-                label="6. Full product details"
-                value={form.description}
-                onChange={(v) => change("description", v)}
-              />
-              <Area
-                label="7. Extra picture links — one per line"
-                value={form.galleryImageUrls.join("\n")}
-                onChange={(v) =>
-                  change("galleryImageUrls", v.split("\n").filter(Boolean))
-                }
-              />
-              <Area
-                label="Feature bullets — one per line"
-                value={form.bullets.join("\n")}
-                onChange={(v) =>
-                  change("bullets", v.split("\n").filter(Boolean))
-                }
-              />
-              <Field
-                label="Badges — comma separated"
-                value={form.badges.join(", ")}
-                onChange={(v) =>
-                  change(
-                    "badges",
-                    v
-                      .split(",")
-                      .map((x) => x.trim())
-                      .filter(Boolean),
-                  )
-                }
-              />
-              <label className="field">
-                Status
-                <select
-                  value={form.status}
-                  onChange={(e) => change("status", e.target.value)}
-                >
-                  <option value="draft">Draft</option>
-                  <option value="published">Published</option>
-                  <option value="archived">Archived</option>
-                </select>
-              </label>
-            </div>
-            <div className="actions">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={form.featured}
-                  onChange={(e) => change("featured", e.target.checked)}
-                />{" "}
-                Featured
-              </label>
-              <button className="adminBtn">{form.status === "published" ? "Save and publish product" : "Save product"}</button>
-              {form.id && (
-                <button type="button" onClick={() => setForm(blankProduct())}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-          <aside>
-            <div className="panel">
-              <h2>Categories</h2>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  style={{ width: "100%", padding: 10 }}
-                  value={categoryName}
-                  onChange={(e) => setCategoryName(e.target.value)}
-                  placeholder="New category"
-                />
-                <button
-                  className="adminBtn"
-                  onClick={async () => {
-                    if (!db || !categoryName.trim()) return;
-                    const x = push(ref(db, "affiliateShop/categories"));
-                    await set(x, {
-                      name: categoryName,
-                      slug: categoryName
-                        .toLowerCase()
-                        .replace(/[^a-z0-9]+/g, "-"),
-                      published: true,
-                      sortOrder: categories.length,
-                      updatedAt: Date.now(),
-                    });
-                    setCategoryName("");
-                  }}
-                >
-                  Add
-                </button>
-              </div>
-              {categories.map((c) => (
-                <div className="row" key={c.id}>
-                  <span>{c.name}</span>
-                  <button
-                    onClick={() =>
-                      db && remove(ref(db, `affiliateShop/categories/${c.id}`))
-                    }
-                  >
-                    Delete
-                  </button>
-                </div>
-              ))}
-            </div>
-            <div className="panel" style={{ marginTop: 20 }}>
-              <div className="productListHead"><div><h2>Products</h2><small>Use Edit to change any listing.</small></div><button type="button" className="adminBtn" onClick={smartSort}>Smart-sort catalog</button></div>
-              {products
-                .sort((a, b) => b.updatedAt - a.updatedAt)
-                .map((p) => (
-                  <div className="row" key={p.id}>
-                    <img src={p.mainImageUrl} alt="" />
-                    <span>
-                      <b>{p.title}</b>
-                      <small style={{ display: "block" }}>{p.status}</small>
-                    </span>
-                    <button type="button" onClick={() => edit(p)}>Edit</button>
-                    <button type="button"
-                      onClick={() =>
-                        confirm(`Delete ${p.title}?`) &&
-                        db &&
-                        remove(ref(db, `affiliateShop/products/${p.id}`))
-                      }
-                    >
-                      Delete
-                    </button>
-                  </div>
-                ))}
-            </div>
-          </aside>
-        </div>
+
+function AdminLogin({title,message,loading=false}:{title:string;message:string;loading?:boolean}){return <div className="adminLogin"><div className="adminState"><span className={loading?"adminSpinner":""}>A</span><h1>{title}</h1><p>{message}</p></div></div>}
+
+function Dashboard({email,onLogout}:{email:string;onLogout:()=>void}){
+  const{products,categories,loading}=useCatalog(true);const[screen,setScreen]=useState<Screen>("overview");const[form,setForm]=useState<Draft>(blankProduct());const[query,setQuery]=useState("");const[status,setStatus]=useState("all");const[notice,setNotice]=useState("");const[categoryName,setCategoryName]=useState("");const[navOpen,setNavOpen]=useState(false);
+  const filtered=useMemo(()=>products.filter(p=>(status==="all"||p.status===status)&&(!query||`${p.title} ${p.brand} ${p.category}`.toLowerCase().includes(query.toLowerCase()))).sort((a,b)=>b.updatedAt-a.updatedAt),[products,query,status]);
+  const change=(k:keyof Draft,v:any)=>setForm(x=>({...x,[k]:v}));
+  const openEditor=(p?:Product)=>{setForm(p?editable(p):blankProduct());setScreen("editor");setNavOpen(false);window.scrollTo({top:0,behavior:"smooth"})};
+  const save=async(e:React.FormEvent)=>{e.preventDefault();if(!db)return;try{const a=new URL(form.amazonUrl),i=new URL(form.mainImageUrl);if(a.protocol!=="https:"||i.protocol!=="https:")throw new Error()}catch{return setNotice("Use complete HTTPS links for the product image and Amazon destination.")}if(!form.title||!form.slug||!form.categoryId)return setNotice("Product name, URL slug and category are required.");const now=Date.now(),target=form.id?ref(db,`affiliateShop/products/${form.id}`):push(ref(db,"affiliateShop/products"));const{id:_id,...data}=form;try{await set(target,{...data,createdAt:form.createdAt||now,updatedAt:now,price:String(form.price??"")===""?null:Number(form.price),oldPrice:String(form.oldPrice??"")===""?null:Number(form.oldPrice),sortOrder:Number(form.sortOrder)||0});setNotice(form.id?"Product changes are live.":"Product created successfully.");setForm(blankProduct());setScreen("products")}catch{setNotice("Auronix could not save this change. Confirm your administrator permissions and retry.")}};
+  const patchProduct=async(p:Product,values:Partial<Product>)=>{if(!db)return;try{await update(ref(db,`affiliateShop/products/${p.id}`),{...values,updatedAt:Date.now()});setNotice(`${p.title} updated.`)}catch{setNotice("The update could not be completed.")}};
+  const duplicate=async(p:Product)=>{if(!db)return;const{id,...data}=p;const target=push(ref(db,"affiliateShop/products"));await set(target,{...data,title:`${p.title} — Copy`,slug:`${p.slug}-copy-${Date.now().toString().slice(-5)}`,status:"draft",featured:false,createdAt:Date.now(),updatedAt:Date.now()});setNotice("A draft copy was created.")};
+  const smartSort=async()=>{if(!db||!products.length)return;setNotice("Optimizing catalog order…");const ranked=[...products].sort((a,b)=>{const score=(p:Product)=>Number(p.featured)*100+(p.rating||0)*8+Number(Boolean(p.oldPrice))*12+Math.min((p.bullets||[]).length,6)*2+Number(Boolean(p.description))*5;return score(b)-score(a)||b.updatedAt-a.updatedAt});const changes:Record<string,number>={};ranked.forEach((p,i)=>changes[`affiliateShop/products/${p.id}/sortOrder`]=i+1);try{await update(ref(db),changes);setNotice("Catalog order optimized successfully.")}catch{setNotice("Catalog order could not be saved.")}};
+  const exportCsv=()=>{const rows=[["Title","Brand","Category","Status","Price","ASIN","Amazon URL"],...products.map(p=>[p.title,p.brand,p.category||"",p.status,String(p.price||""),p.asin||"",p.amazonUrl])];const csv=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=`auronix-catalog-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(a.href)};
+  const nav=(next:Screen)=>{setScreen(next);setNavOpen(false)};
+
+  return <div className="adminShell">
+    <aside className={`adminSidebar ${navOpen?"open":""}`}><div className="sidebarBrand"><span>A</span><div><b>AURONIX</b><small>SHOP ADMIN</small></div><button onClick={()=>setNavOpen(false)}><X/></button></div><nav><p>WORKSPACE</p><button className={screen==="overview"?"active":""} onClick={()=>nav("overview")}><LayoutDashboard/>Overview</button><button className={screen==="products"?"active":""} onClick={()=>nav("products")}><Boxes/>Products <i>{products.length}</i></button><button className={screen==="editor"?"active":""} onClick={()=>openEditor()}><PackagePlus/>Add product</button><button className={screen==="categories"?"active":""} onClick={()=>nav("categories")}><FolderTree/>Categories <i>{categories.length}</i></button><p>STORE</p><Link href="/" target="_blank"><ExternalLink/>Open storefront</Link><button><Settings/>Settings</button></nav><div className="sidebarAccount"><span>{email.charAt(0).toUpperCase()}</span><div><b>Administrator</b><small>{email}</small></div><button onClick={onLogout} title="Sign out"><LogOut/></button></div></aside>
+    {navOpen&&<button className="adminBackdrop" onClick={()=>setNavOpen(false)}/>}<div className="adminWorkspace"><header className="adminHeader"><button className="adminMenu" onClick={()=>setNavOpen(true)}><Menu/></button><div><span>Operations center</span><b>{screen==="overview"?"Store overview":screen==="products"?"Product catalog":screen==="editor"?(form.id?"Edit product":"New product"):"Category manager"}</b></div><div className="adminHeaderActions"><span className="systemStatus"><i/> Store live</span><button className="adminPrimary" onClick={()=>openEditor()}><PackagePlus/> Add product</button></div></header>
+      <main className="adminContent">{notice&&<div className="adminToast"><CheckCircle2/>{notice}<button onClick={()=>setNotice("")}><X/></button></div>}
+        {screen==="overview"&&<Overview products={products} categories={categories.length} loading={loading} onProducts={()=>setScreen("products")} onNew={()=>openEditor()} onSort={smartSort}/>} 
+        {screen==="products"&&<Products products={filtered} query={query} setQuery={setQuery} status={status} setStatus={setStatus} edit={openEditor} duplicate={duplicate} patch={patchProduct} removeProduct={async p=>{if(db&&confirm(`Permanently delete ${p.title}?`))await remove(ref(db,`affiliateShop/products/${p.id}`))}} exportCsv={exportCsv}/>} 
+        {screen==="editor"&&<Editor form={form} setForm={setForm} change={change} categories={categories} save={save} cancel={()=>setScreen("products")}/>} 
+        {screen==="categories"&&<Categories categories={categories} products={products} name={categoryName} setName={setCategoryName} notice={setNotice}/>} 
       </main>
     </div>
-  );
+  </div>;
 }
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string | number;
-  onChange: (v: string) => void;
-  type?: string;
-}) {
-  return (
-    <label className="field">
-      {label}
-      <input
-        type={type}
-        step={type === "number" ? "0.01" : undefined}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
-function Area({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
-  return (
-    <label className="field full">
-      {label}
-      <textarea
-        rows={4}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
+
+function Overview({products,categories,loading,onProducts,onNew,onSort}:{products:Product[];categories:number;loading:boolean;onProducts:()=>void;onNew:()=>void;onSort:()=>void}){const published=products.filter(p=>p.status==="published").length,drafts=products.filter(p=>p.status==="draft").length,quality=products.length?Math.round(products.filter(p=>p.description&&p.bullets?.length&&p.mainImageUrl&&p.amazonUrl).length/products.length*100):0;return <><div className="adminPageTitle"><div><span>LIVE CATALOG</span><h1>Your store at a glance</h1><p>Publishing health, product quality and the actions that need attention.</p></div><button onClick={onNew}><PackagePlus/>Create product</button></div><div className="metricGrid">{[["Total products",loading?"—":products.length,"+ catalog records",Boxes],["Published",published,`${products.length?Math.round(published/products.length*100):0}% of catalog`,CheckCircle2],["Draft queue",drafts,drafts?"Needs review":"All clear",Edit3],["Content quality",`${quality}%`,`${categories} categories`,BarChart3]].map(([label,value,note,Icon]:any)=><div className="metricCard" key={label}><div><span>{label}</span><Icon/></div><strong>{value}</strong><small>{note}</small></div>)}</div><div className="overviewGrid"><section className="adminPanel"><div className="panelTitle"><div><h2>Recently updated</h2><p>Latest changes across your catalog.</p></div><button onClick={onProducts}>View all <ArrowUpRight/></button></div>{products.sort((a,b)=>b.updatedAt-a.updatedAt).slice(0,6).map(p=><div className="activityRow" key={p.id}><img src={p.mainImageUrl} alt=""/><div><b>{p.title}</b><span>{p.brand||p.category} · {new Date(p.updatedAt).toLocaleDateString()}</span></div><em className={p.status}>{p.status}</em></div>)}{!products.length&&<div className="emptyAdmin">No products yet. Create your first catalog item.</div>}</section><section className="adminPanel"><div className="panelTitle"><div><h2>Quick actions</h2><p>Common store operations.</p></div></div><div className="quickActions"><button onClick={onNew}><PackagePlus/><div><b>Add a product</b><span>Create a new listing</span></div><ArrowUpRight/></button><button onClick={onSort}><Sparkles/><div><b>Smart-sort catalog</b><span>Rank stronger listings first</span></div><ArrowUpRight/></button><button onClick={onProducts}><Activity/><div><b>Review drafts</b><span>{drafts} waiting for review</span></div><ArrowUpRight/></button></div></section></div></>}
+
+function Products({products,query,setQuery,status,setStatus,edit,duplicate,patch,removeProduct,exportCsv}:{products:Product[];query:string;setQuery:(v:string)=>void;status:string;setStatus:(v:string)=>void;edit:(p:Product)=>void;duplicate:(p:Product)=>void;patch:(p:Product,v:Partial<Product>)=>void;removeProduct:(p:Product)=>void;exportCsv:()=>void}){return <><div className="adminPageTitle"><div><span>CATALOG CONTROL</span><h1>Products</h1><p>Search, publish, duplicate and manage every listing.</p></div><button className="secondaryAdmin" onClick={exportCsv}><Download/>Export CSV</button></div><section className="adminPanel productManager"><div className="managerToolbar"><div className="adminSearch"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search products, brands or categories…"/></div><select value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Drafts</option><option value="archived">Archived</option></select></div><div className="productTable"><div className="productTableHead"><span>Product</span><span>Category</span><span>Price</span><span>Status</span><span>Actions</span></div>{products.map(p=><div className="productTableRow" key={p.id}><div className="tableProduct"><img src={p.mainImageUrl} alt=""/><div><b>{p.title}</b><small>{p.brand||"No brand"}{p.asin?` · ${p.asin}`:""}</small></div></div><span>{p.category||"Unassigned"}</span><b>{money(p.price,p.currency)||"—"}</b><button className={`statusToggle ${p.status}`} onClick={()=>patch(p,{status:p.status==="published"?"draft":"published"})}><i/>{p.status}</button><div className="rowActions"><button onClick={()=>edit(p)} title="Edit"><Edit3/></button><button onClick={()=>duplicate(p)} title="Duplicate"><Copy/></button><a href={`/product/${p.slug}`} target="_blank" title="Preview"><ExternalLink/></a><button className="danger" onClick={()=>removeProduct(p)} title="Delete"><Trash2/></button></div></div>)}{!products.length&&<div className="emptyAdmin">No products match your filters.</div>}</div></section></>}
+
+function Editor({form,setForm,change,categories,save,cancel}:{form:Draft;setForm:(v:Draft)=>void;change:(k:keyof Draft,v:any)=>void;categories:any[];save:(e:React.FormEvent)=>void;cancel:()=>void}){return <><div className="adminPageTitle"><div><span>{form.id?"EDIT LISTING":"NEW LISTING"}</span><h1>{form.id?form.title:"Create a product"}</h1><p>Build a complete, trustworthy product page for the storefront.</p></div></div><AdminAI form={form} setForm={setForm}/><form className="editorLayout" onSubmit={save}><div className="editorMain"><section className="adminPanel formSection"><div className="sectionNumber">01</div><div><h2>Core information</h2><p>The name and description customers see first.</p></div><div className="premiumFormGrid"><Field label="Product name *" value={form.title} onChange={v=>{change("title",v);if(!form.id)change("slug",v.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""))}}/><Field label="URL slug *" value={form.slug} onChange={v=>change("slug",v)}/><Area label="Short description" value={form.shortDescription} onChange={v=>change("shortDescription",v)}/><Area label="Full product story" value={form.description} onChange={v=>change("description",v)}/></div></section><section className="adminPanel formSection"><div className="sectionNumber">02</div><div><h2>Commerce details</h2><p>Pricing, brand and destination information.</p></div><div className="premiumFormGrid"><Field label="Brand" value={form.brand} onChange={v=>change("brand",v)}/><label className="premiumField">Category *<select value={form.categoryId} onChange={e=>{const c=categories.find(x=>x.id===e.target.value);setForm({...form,categoryId:e.target.value,category:c?.name||""})}}><option value="">Select category</option>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><Field label="Current price" type="number" value={form.price??""} onChange={v=>change("price",v)}/><Field label="Previous price" type="number" value={form.oldPrice??""} onChange={v=>change("oldPrice",v)}/><Field label="Currency" value={form.currency} onChange={v=>change("currency",v)}/><Field label="ASIN / SKU" value={form.asin||""} onChange={v=>change("asin",v)}/><Field label="Amazon affiliate URL *" value={form.amazonUrl} onChange={v=>change("amazonUrl",v)}/><Field label="Availability" value={form.availability||""} onChange={v=>change("availability",v)}/></div></section><section className="adminPanel formSection"><div className="sectionNumber">03</div><div><h2>Media & product detail</h2><p>Add strong images and scannable selling points.</p></div><div className="premiumFormGrid"><Field label="Main image URL *" value={form.mainImageUrl} onChange={v=>change("mainImageUrl",v)}/>{form.mainImageUrl&&<div className="editorPreview"><img src={form.mainImageUrl} alt="Preview"/><span>Live image preview</span></div>}<Area label="Gallery image URLs — one per line" value={form.galleryImageUrls.join("\n")} onChange={v=>change("galleryImageUrls",v.split("\n").filter(Boolean))}/><Area label="Key features — one per line" value={form.bullets.join("\n")} onChange={v=>change("bullets",v.split("\n").filter(Boolean))}/><Field label="Badges — comma separated" value={form.badges.join(", ")} onChange={v=>change("badges",v.split(",").map(x=>x.trim()).filter(Boolean))}/><Field label="Tags — comma separated" value={form.tags.join(", ")} onChange={v=>change("tags",v.split(",").map(x=>x.trim()).filter(Boolean))}/></div></section></div><aside className="editorAside"><section className="adminPanel publishPanel"><h3>Publishing</h3><label className="premiumField">Status<select value={form.status} onChange={e=>change("status",e.target.value)}><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option></select></label><label className="switchRow"><span><b>Featured product</b><small>Prioritize on the storefront</small></span><input type="checkbox" checked={form.featured} onChange={e=>change("featured",e.target.checked)}/><i/></label><Field label="Display priority" type="number" value={form.sortOrder??0} onChange={v=>change("sortOrder",v)}/><button className="publishButton">{form.status==="published"?"Save and publish":"Save product"}</button><button type="button" className="cancelButton" onClick={cancel}>Cancel</button></section><section className="adminPanel qualityPanel"><h3>Listing quality</h3>{[["Product name",!!form.title],["Category",!!form.categoryId],["Main image",!!form.mainImageUrl],["Amazon link",!!form.amazonUrl],["Description",!!form.description],["Features",!!form.bullets.length]].map(([x,ok]:any)=><div key={x} className={ok?"done":""}><i>{ok?"✓":""}</i><span>{x}</span></div>)}</section></aside></form></>}
+
+function Categories({categories,products,name,setName,notice}:{categories:any[];products:Product[];name:string;setName:(v:string)=>void;notice:(v:string)=>void}){return <><div className="adminPageTitle"><div><span>CATALOG STRUCTURE</span><h1>Categories</h1><p>Organize products into clear, customer-friendly collections.</p></div></div><section className="adminPanel categoryManager"><div className="categoryCreate"><div><h2>Create category</h2><p>Add a new top-level catalog category.</p></div><div><input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. Home & Kitchen"/><button onClick={async()=>{if(!db||!name.trim())return;const x=push(ref(db,"affiliateShop/categories"));await set(x,{name:name.trim(),slug:name.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,""),published:true,sortOrder:categories.length,updatedAt:Date.now()});setName("");notice("Category created.")}}>Add category</button></div></div><div className="categoryGrid">{categories.sort((a,b)=>a.sortOrder-b.sortOrder).map(c=><article key={c.id}><span>{c.name.charAt(0)}</span><div><h3>{c.name}</h3><p>{products.filter(p=>p.categoryId===c.id).length} products · {c.published!==false?"Visible":"Hidden"}</p></div><button onClick={async()=>{if(db&&confirm(`Delete ${c.name}? Products will not be deleted.`)){await remove(ref(db,`affiliateShop/categories/${c.id}`));notice("Category deleted.")}}}><Trash2/></button></article>)}</div></section></>}
+
+function Field({label,value,onChange,type="text"}:{label:string;value:string|number;onChange:(v:string)=>void;type?:string}){return <label className="premiumField">{label}<input type={type} step={type==="number"?"0.01":undefined} value={value} onChange={e=>onChange(e.target.value)}/></label>}
+function Area({label,value,onChange}:{label:string;value:string;onChange:(v:string)=>void}){return <label className="premiumField fullField">{label}<textarea rows={5} value={value} onChange={e=>onChange(e.target.value)}/></label>}
